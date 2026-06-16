@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>直笛水果忍者 🎵🍉 - 雙重難度版</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            overflow: hidden;
+            background: #1a1a2e;
+            font-family: 'Nunito', 'Microsoft JhengHei', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            transition: background 0.5s ease;
+        }
+
+        /* ── 星空背景 ── */
+        body::before {
+            content: ''; position: fixed; inset: 0;
+            background: radial-gradient(ellipse at 20% 30%, #16213e 0%, #0f3460 60%, #1a1a2e 100%);
+            z-index: 0; transition: opacity 0.5s ease, filter 0.5s ease;
+        }
+
+        body.fever-active::before {
+            background: radial-gradient(ellipse at center, #833ab4 0%, #fd1d1d 50%, #fcb045 100%);
+            animation: pulse-fever 1s infinite alternate; opacity: 0.6;
+        }
+
+        @keyframes pulse-fever {
+            from { filter: hue-rotate(0deg) brightness(1); }
+            to { filter: hue-rotate(30deg) brightness(1.3); }
+        }
+
+        canvas { position: absolute; top: 0; left: 0; z-index: 1; }
+
+        /* ── HUD 頂部 ── */
+        #hud {
+            display: none; position: absolute; top: 0; left: 0; right: 0; z-index: 20;
+            padding: 14px 24px; justify-content: space-between; align-items: center;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+        }
+        
+        .hud-pill {
+            background: rgba(255,255,255,0.12); border: 1.5px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(8px); border-radius: 999px; padding: 8px 22px;
+            font-size: 20px; font-weight: 900; color: #fff; letter-spacing: 1px;
+            display: flex; align-items: center; gap: 8px; width: fit-content;
+        }
+        .hud-pill span { color: #f9ca24; }
+        #comboDisplay { color: #ff7675; text-shadow: 0 0 10px rgba(255, 118, 117, 0.8); transition: transform 0.1s; }
+
+        /* ── 動態音準儀 (中下方) ── */
+        #tuner-container {
+            display: none; /* 遊戲開始才顯示 */
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: rgba(12, 18, 40, 0.85); border: 1.5px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(8px); border-radius: 16px; padding: 12px 20px;
+            flex-direction: column; align-items: center; gap: 8px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+            width: 280px; z-index: 20;
+        }
+        .tuner-title { font-size: 13px; color: #cbd5e1; font-weight: bold; letter-spacing: 1px; }
+        .tuner-gauge {
+            width: 100%; height: 8px; background: rgba(255,255,255,0.1);
+            border-radius: 4px; position: relative; margin: 5px 0;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        }
+        .tuner-center-mark {
+            position: absolute; left: 50%; top: -4px; bottom: -4px; width: 2px;
+            background: rgba(255,255,255,0.6); transform: translateX(-50%);
+        }
+        #tuner-pointer {
+            position: absolute; left: 50%; top: -8px; width: 0; height: 0;
+            border-left: 8px solid transparent; border-right: 8px solid transparent;
+            border-bottom: 12px solid #cbd5e1;
+            transform: translateX(-50%); transition: left 0.1s ease-out, border-bottom-color 0.1s;
+        }
+        #tuner-label { font-size: 15px; font-weight: 900; color: #cbd5e1; min-height: 20px; }
+
+        /* ── 能量條 (正中間) ── */
+        #fever-container {
+            display: none; position: absolute; top: 75px; left: 50%; transform: translateX(-50%);
+            width: 50%; max-width: 400px; z-index: 20; text-align: center;
+        }
+        #fever-bar-bg {
+            width: 100%; height: 14px; background: rgba(255,255,255,0.15);
+            border: 2px solid rgba(255,255,255,0.3); border-radius: 10px; overflow: hidden;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        }
+        #fever-bar-fill {
+            width: 0%; height: 100%; background: linear-gradient(90deg, #feca57, #ff9ff3, #ff6b6b);
+            transition: width 0.1s linear; box-shadow: 0 0 10px rgba(255, 107, 107, 0.8);
+        }
+        #fever-text {
+            display: none; font-size: 22px; font-weight: 900; color: #fff; letter-spacing: 2px;
+            text-shadow: 0 0 15px #ff9ff3, 0 0 30px #ff6b6b; margin-top: 8px;
+            animation: bounce 0.5s infinite alternate;
+        }
+        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-5px); } }
+
+        /* ── 側邊音符提示板 ── */
+        #note-sidebar {
+            position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
+            z-index: 20; display: none; flex-direction: column; gap: 10px;
+        }
+        .note-card {
+            width: 72px; border-radius: 14px; padding: 8px 0; text-align: center;
+            font-size: 15px; font-weight: 900; color: rgba(255,255,255,0.85);
+            background: rgba(255,255,255,0.08); border: 1.5px solid rgba(255,255,255,0.12);
+            backdrop-filter: blur(6px); transition: transform 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
+        }
+        .note-card .note-name { display: block; font-size: 17px; letter-spacing: 1px; }
+        .note-card .note-freq { display: block; font-size: 11px; opacity: 0.6; }
+        .note-card.active { transform: scale(1.15) translateX(6px); border-color: currentColor; box-shadow: 0 0 18px currentColor; background: rgba(255,255,255,0.15); }
+
+        /* ── 三段式獨立選單系統 ── */
+        #menu-viewport {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            overflow: hidden; z-index: 30;
+        }
+        #menu-slider {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 300vh;
+            transform: translateY(-100vh); 
+            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .menu-page {
+            width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center;
+        }
+        .panel {
+            background: rgba(12, 18, 40, 0.92); border: 1.5px solid rgba(255,255,255,0.1);
+            border-radius: 22px; padding: 32px 30px 28px; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            backdrop-filter: blur(12px); text-align: center; color: #fff; width: min(520px, 92vw);
+        }
+        .panel h1 { font-size: 30px; margin: 10px 0; line-height: 1.2; }
+        .panel h2 { color: #f9ca24; margin-bottom: 20px; }
+        .panel h3 { margin: 22px 0 10px; font-size: 16px; letter-spacing: 1px; color: #f9ca24; }
+        
+        .nav-arrow {
+            background: transparent; border: none; color: #cbd5e1; font-size: 16px;
+            cursor: pointer; padding: 12px; font-weight: bold; width: 100%; transition: 0.2s; letter-spacing: 2px;
+        }
+        .nav-arrow:hover { color: #f9ca24; transform: scale(1.05); }
+
+        .title-link { color: #fff; text-decoration: none; transition: color 0.2s ease, text-shadow 0.2s ease; }
+        .title-link:hover { color: #f9ca24; text-shadow: 0 0 15px rgba(249, 202, 36, 0.8); }
+
+        .btn-group { display: flex; gap: 15px; justify-content: center; margin: 15px 0; flex-wrap: wrap; }
+        .btn-mode {
+            padding: 14px 28px; font-size: 18px; font-weight: 900; font-family: inherit;
+            border: none; border-radius: 999px; cursor: pointer; color: #fff;
+            transition: transform 0.15s, box-shadow 0.15s, filter 0.15s; display: flex; align-items: center; gap: 8px;
+        }
+        .btn-turtle { background: linear-gradient(135deg, #2ecc71, #27ae60); box-shadow: 0 6px 20px rgba(46, 204, 113, 0.35); }
+        .btn-rabbit { background: linear-gradient(135deg, #ff7675, #d63031); box-shadow: 0 6px 20px rgba(255, 118, 117, 0.35); }
+        .btn-mode:hover { transform: scale(1.08); filter: brightness(1.1); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+        th { font-size: 12px; color: #718096; padding: 6px; text-transform: uppercase; letter-spacing: 1px; }
+        td { padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 14px; }
+        tr:last-child td { border-bottom: none; }
+        td.score-val { color: #f9ca24; font-weight: 900; font-size: 16px; }
+
+        #gameOverOverlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 40; display: none;
+        }
+        #finalScore { color: #f9ca24; font-size: 52px; font-weight: 900; display: block; margin: 10px 0; }
+        input[type=text] {
+            padding: 10px 16px; font-size: 15px; font-family: inherit; border-radius: 999px;
+            border: 1.5px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08);
+            color: #fff; text-align: center; width: 82%; margin-top: 12px; outline: none;
+        }
+        input[type=text]::placeholder { color: rgba(255,255,255,0.35); }
+        #saveMsg { font-size: 13px; color: #6fcf97; margin-top: 8px; min-height: 18px; }
+
+        .btn-main {
+            display: inline-block; padding: 12px 30px; font-size: 16px; margin-top: 10px;
+            font-weight: 900; font-family: inherit; background: linear-gradient(135deg, #f9ca24, #f0932b);
+            color: #1a1a2e; border: none; border-radius: 999px; cursor: pointer;
+        }
+
+        #debug-info {
+            position: absolute; bottom: 12px; left: 12px; font-size: 12px; color: rgba(255,255,255,0.4);
+            z-index: 20; background: rgba(0,0,0,0.4); padding: 5px 10px; border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="hud">
+    <div class="hud-pill">🎵 分數 <span id="scoreDisplay">0</span></div>
+    <div class="hud-pill" style="border-color: rgba(255, 118, 117, 0.4);">🔥 連擊 <span id="comboDisplay">0</span></div>
+    <div class="hud-pill">⏱ <span id="timerDisplay">60</span></div>
+</div>
+
+<div id="fever-container">
+    <div id="fever-bar-bg"><div id="fever-bar-fill"></div></div>
+    <div id="fever-text">FEVER TIME x2!</div>
+</div>
+
+<div id="tuner-container">
+    <div class="tuner-title">🎤 直笛音準儀 (Visual Tuner)</div>
+    <div class="tuner-gauge">
+        <div class="tuner-center-mark"></div>
+        <div id="tuner-pointer"></div>
+    </div>
+    <div id="tuner-label">等待吹奏...</div>
+</div>
+
+<div id="note-sidebar">
+    <div class="note-card" id="card-Sol" style="color:#f9ca24;"><span class="note-name">Sol</span><span class="note-freq">784 Hz</span></div>
+    <div class="note-card" id="card-La" style="color:#f0932b;"><span class="note-name">La</span><span class="note-freq">880 Hz</span></div>
+    <div class="note-card" id="card-Si" style="color:#eb4d4b;"><span class="note-name">Si</span><span class="note-freq">988 Hz</span></div>
+    <div class="note-card" id="card-Do" style="color:#2ecc71;"><span class="note-name">Do</span><span class="note-freq">1047 Hz</span></div>
+    <div class="note-card" id="card-Re" style="color:#9b59b6;"><span class="note-name">Re</span><span class="note-freq">1175 Hz</span></div>
+</div>
+
+<div id="menu-viewport">
+    <div id="menu-slider">
+        <div class="menu-page" id="page-rules">
+            <div class="panel">
+                <h2>📖 規則說明</h2>
+                <div style="text-align:left; font-size: 15px; color: #cbd5e1; line-height: 1.8; margin-bottom: 20px; padding: 0 10px;">
+                    <p>🎵 <b>操作方式</b>：吹出畫面顯示音高切開水果。</p>
+                    <p>🎯 <b>音準輔助</b>：畫面上方的音準儀會幫助你檢視氣流：<br><span style="color:#ff7675;">太用力偏右 (就是偏高)</span>，<span style="color:#74b9ff;">氣太弱偏左 (就是偏低)</span>。</p>
+                    <p>🔴 <b>長音機制</b>：較大顆的物件，必須穩定吹奏「長音」才能切開。</p>
+                    <p>🔥 <b>狂熱模式</b>：連續不漏接可累積能量，觸發 <b>FEVER 雙倍分數</b>！</p>
+                </div>
+                <button class="nav-arrow" onclick="slideMenu(1)">▼ 返回主畫面 ▼</button>
+            </div>
+        </div>
+
+        <div class="menu-page" id="page-main">
+            <div class="panel">
+                <button class="nav-arrow" onclick="slideMenu(0)">▲ 規則說明 ▲</button>
+                
+                <h1><a href="https://www.youtube.com/@datoemusic" target="_blank" class="title-link">DatoE.</a></h1>
+                <img src="icon.jpg" alt="遊戲 Logo" style="width: 100%; max-width: 400px; max-height: 40vh; object-fit: contain; margin: 15px auto; display: block; border-radius: 20px; filter: drop-shadow(0px 10px 30px rgba(255, 255, 255, 0.25));">
+                
+                <div class="btn-group">
+                    <button class="btn-mode btn-turtle" onclick="startGame('turtle')">🐢 烏龜版</button>
+                    <button class="btn-mode btn-rabbit" onclick="startGame('rabbit')">🐇 兔子版</button>
+                </div>
+
+                <button class="nav-arrow" onclick="slideMenu(2)">▼ 排行榜 ▼</button>
+            </div>
+        </div>
+
+        <div class="menu-page" id="page-leaderboard">
+            <div class="panel">
+                <button class="nav-arrow" onclick="slideMenu(1)">▲ 返回主畫面 ▲</button>
+                <h2>🏆 英雄榜 🏆 </h2>
+                <table id="leaderboardTable">
+                    <tr><th>名次</th><th>玩家</th><th>分數</th></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="gameOverOverlay" class="panel">
+    <h1>Time's up！⏱️</h1>
+    <p>你的最終分數</p>
+    <span id="finalScore">0</span>
+    <br>
+    <input type="text" id="playerName" placeholder="請輸入你的名字" maxlength="10">
+    <br>
+    <button class="btn-main" id="saveScoreBtn">儲存成績</button>
+    <p id="saveMsg"></p>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+<div id="debug-info">偵測音頻: --- Hz | 判定: 無</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let score = 0, combo = 0, timeLeft = 60, fruits = [], effects = [], gameActive = false;
+let timerInterval = null, spawnTimeout = null;
+
+let energy = 0, isFever = false, feverTimeLeft = 0, feverInterval = null;
+let currentDifficulty = 'turtle';
+
+const notes = [
+    { id: 'Sol', name: 'Sol', freq: 784,  color: '#f9ca24', range: 22 },
+    { id: 'La',  name: 'La',  freq: 880,  color: '#f0932b', range: 22 },
+    { id: 'Si',  name: 'Si',  freq: 988,  color: '#eb4d4b', range: 22 },
+    { id: 'Do',  name: 'Do',  freq: 1047, color: '#2ecc71', range: 22 },
+    { id: 'Re',  name: 'Re',  freq: 1175, color: '#9b59b6', range: 45 },
+];
+
+let audioContext, analyser;
+const bufferLength = 2048;
+let buffer = new Float32Array(bufferLength);
+let audioInitialized = false;
+let activeSidebarCard = null;
+
+const LONG_MAX_SUSTAIN = 15;
+
+const fruitShapes = {
+    Sol: (ctx, x, y, r) => { 
+        ctx.beginPath(); ctx.ellipse(x, y, r * 0.7, r, 0, 0, Math.PI * 2); ctx.fillStyle = '#f9ca24'; ctx.fill();
+        ctx.beginPath(); ctx.ellipse(x - r * 0.2, y - r * 0.25, r * 0.25, r * 0.35, -0.4, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fill();
+    },
+    La: (ctx, x, y, r) => { 
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = '#f0932b'; ctx.fill();
+        for (let i = 0; i < 5; i++) {
+            const angle = (i / 5) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(angle) * r * 0.9, y + Math.sin(angle) * r * 0.9); ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1; ctx.stroke();
+        }
+        ctx.beginPath(); ctx.arc(x - r * 0.22, y - r * 0.28, r * 0.28, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fill();
+    },
+    Si: (ctx, x, y, r) => { 
+        ctx.beginPath(); ctx.arc(x, y + r * 0.1, r * 0.95, 0.3, Math.PI - 0.3, false); ctx.arc(x, y + r * 0.1, r * 0.95, Math.PI + 0.3, -0.3, false); ctx.fillStyle = '#eb4d4b'; ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x, y - r * 0.8); ctx.quadraticCurveTo(x + r * 0.35, y - r * 1.3, x + r * 0.1, y - r * 0.85); ctx.strokeStyle = '#6ab04c'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.beginPath(); ctx.arc(x - r * 0.25, y - r * 0.2, r * 0.28, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fill();
+    },
+    Do: (ctx, x, y, r) => { 
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI, false); ctx.lineTo(x - r, y); ctx.fillStyle = '#2ecc71'; ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, r * 0.85, 0, Math.PI, false); ctx.fillStyle = '#e74c3c'; ctx.fill();
+        ctx.fillStyle = '#000';
+        for(let i=0; i<3; i++){ ctx.beginPath(); ctx.arc(x - r*0.4 + (i*r*0.4), y + r*0.4, r*0.08, 0, Math.PI*2); ctx.fill(); }
+    },
+    Re: (ctx, x, y, r) => { 
+        const positions = [[0, 0], [-r*0.45, r*0.3], [r*0.45, r*0.3], [-r*0.22, -r*0.45], [r*0.22, -r*0.45], [0, r*0.68]];
+        for (const [dx, dy] of positions) {
+            ctx.beginPath(); ctx.arc(x + dx, y + dy, r * 0.38, 0, Math.PI * 2); ctx.fillStyle = '#9b59b6'; ctx.fill();
+            ctx.beginPath(); ctx.arc(x + dx - r*0.1, y + dy - r*0.12, r * 0.12, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fill();
+        }
+    },
+};
+
+function slideMenu(pageIndex) {
+    const slider = document.getElementById('menu-slider');
+    slider.style.transform = `translateY(${-(pageIndex * 100)}vh)`;
+    if(pageIndex === 2) loadLeaderboard();
+}
+
+function loadLeaderboard() {
+    const lb = JSON.parse(localStorage.getItem('recorderNinja_Final_v1')) || [];
+    const table = document.getElementById('leaderboardTable');
+    table.innerHTML = '<tr><th>名次</th><th>玩家</th><th>分數</th></tr>';
+    if (lb.length === 0) { table.innerHTML += '<tr><td colspan="3" style="color:#718096;padding:14px">目前尚無成績，快來挑戰！</td></tr>'; } 
+    else { lb.forEach((entry, i) => { const icon = ['🥇','🥈','🥉'][i] || `${i+1}.`; table.innerHTML += `<tr><td>${icon}</td><td>${entry.name}</td><td class="score-val">${entry.score}</td></tr>`; }); }
+}
+loadLeaderboard();
+
+async function startGame(mode) {
+    currentDifficulty = mode; 
+    
+    if (!audioInitialized) {
+        try {
+            let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = bufferLength * 2;
+            analyser.smoothingTimeConstant = 0.2;
+            audioContext.createMediaStreamSource(stream).connect(analyser);
+            audioInitialized = true;
+            setInterval(detectPitch, 50);
+        } catch (err) { alert('⚠️ 無法存取麥克風權限，遊戲無法開始！'); return; }
+    } else if (audioContext.state === 'suspended') { audioContext.resume(); }
+
+    document.getElementById('menu-viewport').style.display = 'none';
+    document.getElementById('hud').style.display = 'flex';
+    document.getElementById('note-sidebar').style.display = 'flex';
+    document.getElementById('fever-container').style.display = 'block';
+    document.getElementById('tuner-container').style.display = 'flex'; // 顯示調音器
+
+    score = 0; combo = 0; timeLeft = 60; fruits = []; effects = [];
+    energy = 0; isFever = false; document.body.classList.remove('fever-active');
+    document.getElementById('fever-text').style.display = 'none';
+    clearInterval(feverInterval);
+
+    updateHUD(); gameActive = true; updateGame(); spawnFruitLoop();
+    timerInterval = setInterval(() => { timeLeft--; updateHUD(); if (timeLeft <= 0) endGame(); }, 1000);
+}
+
+function endGame() {
+    gameActive = false; clearInterval(timerInterval); clearTimeout(spawnTimeout); clearInterval(feverInterval);
+    document.getElementById('hud').style.display = 'none'; document.getElementById('note-sidebar').style.display = 'none';
+    document.getElementById('fever-container').style.display = 'none'; document.body.classList.remove('fever-active');
+    document.getElementById('tuner-container').style.display = 'none'; // 隱藏調音器
+    
+    document.getElementById('gameOverOverlay').style.display = 'block';
+    document.getElementById('finalScore').innerText = score; document.getElementById('playerName').value = '';
+}
+
+document.getElementById('saveScoreBtn').addEventListener('click', () => {
+    let name = document.getElementById('playerName').value.trim() || '無名英雄';
+    let lb = JSON.parse(localStorage.getItem('recorderNinja_Final_v1')) || [];
+    lb.push({ name, score }); lb.sort((a, b) => b.score - a.score);
+    localStorage.setItem('recorderNinja_Final_v1', JSON.stringify(lb.slice(0, 5)));
+    document.getElementById('saveMsg').innerText = '✓ 儲存成功！返回中…';
+    setTimeout(() => {
+        document.getElementById('gameOverOverlay').style.display = 'none';
+        document.getElementById('menu-viewport').style.display = 'block';
+        slideMenu(1); 
+        document.getElementById('saveMsg').innerText = '';
+    }, 1500);
+});
+
+function updateHUD() {
+    document.getElementById('scoreDisplay').innerText = score;
+    document.getElementById('timerDisplay').innerText = timeLeft;
+    const comboEl = document.getElementById('comboDisplay');
+    comboEl.innerText = `${combo}x`;
+    comboEl.style.transform = 'scale(1.5)';
+    setTimeout(() => comboEl.style.transform = 'scale(1)', 100);
+    document.getElementById('fever-bar-fill').style.width = `${Math.min(energy, 100)}%`;
+}
+
+function startFever() {
+    isFever = true; feverTimeLeft = 10;
+    document.body.classList.add('fever-active');
+    document.getElementById('fever-text').style.display = 'block';
+    clearInterval(feverInterval);
+    feverInterval = setInterval(() => {
+        feverTimeLeft -= 0.1; energy = (feverTimeLeft / 10) * 100; updateHUD();
+        if (feverTimeLeft <= 0) endFever();
+    }, 100);
+}
+
+function endFever() {
+    clearInterval(feverInterval); isFever = false; energy = 0;
+    document.body.classList.remove('fever-active'); document.getElementById('fever-text').style.display = 'none';
+    updateHUD();
+}
+
+function autoCorrelate(buf, sampleRate) {
+    let SIZE = buf.length, rms = 0;
+    for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
+    rms = Math.sqrt(rms / SIZE);
+    if (rms < 0.02) return -1;
+    let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+    for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+    for (let i = 1; i < SIZE / 2; i++) if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+    buf = buf.slice(r1, r2); SIZE = buf.length;
+    let c = new Array(SIZE).fill(0);
+    for (let i = 0; i < SIZE; i++) for (let j = 0; j < SIZE - i; j++) c[i] += buf[j] * buf[j + i];
+    let d = 0; while (c[d] > c[d + 1]) d++;
+    let maxval = -1, maxpos = -1;
+    for (let i = d; i < SIZE; i++) if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+    if (maxpos < 20 || maxpos > 1000) return -1;
+    return sampleRate / maxpos;
+}
+
+let sidebarTimer = null;
+function highlightSidebar(noteName) {
+    if (activeSidebarCard) activeSidebarCard.classList.remove('active');
+    const card = document.getElementById('card-' + noteName);
+    if (card) { card.classList.add('active'); activeSidebarCard = card; }
+    clearTimeout(sidebarTimer);
+    sidebarTimer = setTimeout(() => { if (activeSidebarCard) activeSidebarCard.classList.remove('active'); }, 400);
+}
+
+function resetTuner() {
+    const pointer = document.getElementById('tuner-pointer');
+    const label = document.getElementById('tuner-label');
+    pointer.style.left = '50%';
+    pointer.style.borderBottomColor = '#cbd5e1';
+    label.innerText = '等待吹奏...';
+    label.style.color = '#cbd5e1';
+}
+
+function detectPitch() {
+    if (!gameActive || !audioInitialized) return;
+    analyser.getFloatTimeDomainData(buffer);
+    let freq = autoCorrelate(buffer, audioContext.sampleRate);
+    
+    let detectedNoteId = null; 
+    let detectedNoteName = "無";
+
+    if (freq !== -1) {
+        let closestNote = null;
+        let minDiff = Infinity;
+        for (let note of notes) {
+            let diff = Math.abs(freq - note.freq);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestNote = note;
+            }
+        }
+
+        if (closestNote && minDiff < 100) { 
+            let cents = 1200 * Math.log2(freq / closestNote.freq);
+            let pointerPos = 50 + cents; 
+            pointerPos = Math.max(0, Math.min(100, pointerPos));
+            
+            const pointer = document.getElementById('tuner-pointer');
+            const label = document.getElementById('tuner-label');
+            pointer.style.left = pointerPos + '%';
+
+            if (Math.abs(cents) < 15) {
+                label.innerText = `音準完美 (${closestNote.name})`;
+                label.style.color = '#2ecc71';
+                pointer.style.borderBottomColor = '#2ecc71';
+            } else if (cents > 0) {
+                label.innerText = `太用力 (偏高) 💨`;
+                label.style.color = '#ff7675';
+                pointer.style.borderBottomColor = '#ff7675';
+            } else {
+                label.innerText = `氣太弱 (偏低) 🌬️`;
+                label.style.color = '#74b9ff';
+                pointer.style.borderBottomColor = '#74b9ff';
+            }
+
+            if (minDiff < closestNote.range) {
+                detectedNoteId = closestNote.id; 
+                detectedNoteName = closestNote.name;
+                highlightSidebar(closestNote.name);
+            }
+        } else {
+            resetTuner();
+        }
+        
+        document.getElementById('debug-info').innerText = `偵測音頻: ${Math.round(freq)} Hz | 判定: ${detectedNoteName}`;
+    } else { 
+        resetTuner();
+        document.getElementById('debug-info').innerText = `偵測音頻: --- Hz | 判定: 無`; 
+    }
+    processHits(detectedNoteId);
+}
+
+function processHits(playedNoteId) {
+    let currentTarget = null;
+    if (playedNoteId) {
+        for (let i = 0; i < fruits.length; i++) {
+            let f = fruits[i];
+            if (f.active && f.note.id === playedNoteId && f.y > 50 && f.y < canvas.height) { currentTarget = f; break; }
+        }
+    }
+
+    for (let i = 0; i < fruits.length; i++) {
+        let f = fruits[i];
+        if (!f.active) continue;
+
+        if (f.isLong) {
+            if (f === currentTarget) {
+                f.sustain++;
+                if (f.sustain >= LONG_MAX_SUSTAIN) triggerFruitHit(f);
+            } else { if (f.sustain > 0) f.sustain--; } 
+        } else {
+            if (f === currentTarget) triggerFruitHit(f);
+        }
+    }
+}
+
+function triggerFruitHit(f) {
+    f.active = false;
+    combo++;
+    let baseScore = f.isLong ? 20 : 10;
+    let multiplier = isFever ? 2 : 1;
+    let earned = (baseScore + (combo - 1) * 5) * multiplier; 
+    score += earned;
+    
+    if (!isFever) {
+        energy += (f.isLong ? 15 : 10);
+        if (energy >= 100) { energy = 100; startFever(); }
+    }
+    
+    updateHUD();
+    effects.push(new SlashEffect(f.x, f.y, f.note.color));
+    effects.push(new ScorePopup(f.x, f.y, earned, isFever));
+}
+
+class SlashEffect {
+    constructor(x, y, color) {
+        this.x = x; this.y = y; this.color = color;
+        this.life = 22; this.maxLife = 22; this.angle = Math.random() * Math.PI; this.len = 110 + Math.random() * 30;
+    }
+    update() { this.life--; }
+    draw() {
+        if (this.life <= 0) return;
+        const t = this.life / this.maxLife;
+        ctx.save(); ctx.globalAlpha = t; ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+        const grad = ctx.createLinearGradient(-this.len, 0, this.len, 0);
+        grad.addColorStop(0, 'transparent'); grad.addColorStop(0.5, this.color); grad.addColorStop(1, 'transparent');
+        ctx.strokeStyle = grad; ctx.lineWidth = 18 * t; ctx.beginPath(); ctx.moveTo(-this.len, 0); ctx.lineTo(this.len, 0); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 4 * t; ctx.beginPath(); ctx.moveTo(-this.len * 0.8, 0); ctx.lineTo(this.len * 0.8, 0); ctx.stroke();
+        ctx.restore();
+    }
+}
+
+class ScorePopup {
+    constructor(x, y, val, fever) {
+        this.x = x + (Math.random() - 0.5) * 30; this.y = y; this.val = val; this.life = 40; this.maxLife = 40; this.fever = fever;
+    }
+    update() { this.y -= 1.5; this.life--; }
+    draw() {
+        if (this.life <= 0) return;
+        const t = this.life / this.maxLife;
+        ctx.save(); ctx.globalAlpha = t; 
+        ctx.font = `bold ${this.fever ? 36 : 28}px Nunito, sans-serif`;
+        ctx.fillStyle = this.fever ? '#ff9ff3' : (this.val >= 30 ? '#ff7675' : '#f9ca24'); 
+        if (this.fever) { ctx.shadowBlur = 10; ctx.shadowColor = '#ff6b6b'; }
+        ctx.textAlign = 'center'; ctx.fillText(`+${this.val}`, this.x, this.y); ctx.restore();
+    }
+}
+
+class Fruit {
+    constructor() {
+        this.x = Math.random() * (canvas.width - 320) + 160;
+        this.y = canvas.height + 55;
+        this.vx = (Math.random() - 0.5) * 2.5;
+        
+        if (currentDifficulty === 'turtle') {
+            this.vy = -(Math.random() * 2 + 7.5); 
+            this.gravity = 0.05; 
+        } else {
+            this.vy = -(Math.random() * 3 + 10); 
+            this.gravity = 0.12; 
+        }
+        
+        this.note = notes[Math.floor(Math.random() * notes.length)];
+        this.isLong = Math.random() < 0.3;
+        this.radius = this.isLong ? 55 : 40; 
+        this.active = true;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotSpeed = (Math.random() - 0.5) * 0.04;
+        this.sustain = 0; 
+    }
+    update() {
+        this.x += this.vx; this.y += this.vy; this.vy += this.gravity; this.rotation += this.rotSpeed;
+        if (this.x < 80 || this.x > canvas.width - 80) this.vx *= -1;
+    }
+    draw() {
+        const r = this.radius;
+        ctx.save(); ctx.translate(this.x, this.y);
+
+        if (this.isLong && this.sustain > 0) {
+            ctx.beginPath(); let progress = this.sustain / LONG_MAX_SUSTAIN;
+            ctx.arc(0, 0, r + 12, -Math.PI/2, -Math.PI/2 + (Math.PI * 2 * progress));
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.stroke();
+            ctx.shadowBlur = 25; ctx.shadowColor = '#ffffff';
+        } else { ctx.shadowBlur = 18; ctx.shadowColor = this.note.color; }
+
+        ctx.rotate(this.rotation);
+        
+        const shapeFn = fruitShapes[this.note.id]; 
+        if (shapeFn) shapeFn(ctx, 0, 0, r);
+
+        ctx.shadowBlur = 0;
+        ctx.rotate(-this.rotation); 
+        
+        ctx.font = `bold ${this.isLong ? 26 : 18}px Nunito, sans-serif`;
+        ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 6; ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.fillText(this.note.name, 0, 0); ctx.shadowBlur = 0;
+        
+        ctx.restore();
+    }
+}
+
+function spawnFruitLoop() {
+    if (!gameActive) return;
+    
+    const maxFruits = currentDifficulty === 'turtle' ? 2 : 4;
+    if (fruits.length < maxFruits) fruits.push(new Fruit());
+    
+    let delay = currentDifficulty === 'turtle' ? (Math.random() * 1500 + 1200) : (Math.random() * 800 + 500);
+    spawnTimeout = setTimeout(spawnFruitLoop, delay);
+}
+
+function updateGame() {
+    if (!gameActive) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = effects.length - 1; i >= 0; i--) {
+        effects[i].update(); effects[i].draw();
+        if (effects[i].life <= 0) effects.splice(i, 1);
+    }
+    
+    for (let i = fruits.length - 1; i >= 0; i--) {
+        let f = fruits[i];
+        if (f.active) {
+            f.update(); f.draw();
+            if (f.y > canvas.height + 100) {
+                if (combo > 0) effects.push(new ScorePopup(f.x, canvas.height - 50, "Miss!", false)); 
+                combo = 0; updateHUD(); fruits.splice(i, 1);
+            }
+        } else { fruits.splice(i, 1); }
+    }
+    requestAnimationFrame(updateGame);
+}
+
+window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+</script>
+</body>
+</html>
