@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>直笛水果忍者 🎵🍉 - 雙重難度版</title>
+    <title>弦音忍者：大提琴空弦道場</title>
+    <link rel="icon" href="icon.jpg">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
 
@@ -11,7 +12,7 @@
 
         body {
             overflow: hidden;
-            background: #1a1a2e;
+            background: #10131a;
             font-family: 'Nunito', 'Microsoft JhengHei', sans-serif;
             display: flex;
             justify-content: center;
@@ -20,15 +21,22 @@
             transition: background 0.5s ease;
         }
 
-        /* ── 星空背景 ── */
+        /* ── 舞台背景 ── */
         body::before {
             content: ''; position: fixed; inset: 0;
-            background: radial-gradient(ellipse at 20% 30%, #16213e 0%, #0f3460 60%, #1a1a2e 100%);
+            background:
+                radial-gradient(circle at 18% 24%, rgba(46, 204, 113, 0.28), transparent 30%),
+                radial-gradient(circle at 86% 18%, rgba(249, 202, 36, 0.22), transparent 26%),
+                radial-gradient(circle at 50% 84%, rgba(235, 77, 75, 0.16), transparent 32%),
+                linear-gradient(135deg, #10131a 0%, #1d2530 48%, #271a2f 100%);
             z-index: 0; transition: opacity 0.5s ease, filter 0.5s ease;
         }
 
         body.fever-active::before {
-            background: radial-gradient(ellipse at center, #833ab4 0%, #fd1d1d 50%, #fcb045 100%);
+            background:
+                radial-gradient(circle at 50% 42%, rgba(255, 118, 117, 0.62), transparent 34%),
+                radial-gradient(circle at 20% 78%, rgba(0, 184, 148, 0.42), transparent 30%),
+                linear-gradient(135deg, #301c23 0%, #714221 50%, #173d3a 100%);
             animation: pulse-fever 1s infinite alternate; opacity: 0.6;
         }
 
@@ -37,7 +45,11 @@
             to { filter: hue-rotate(30deg) brightness(1.3); }
         }
 
-        canvas { position: absolute; top: 0; left: 0; z-index: 1; }
+        #three-root {
+            position: absolute; inset: 0; z-index: 1; pointer-events: none;
+        }
+        #three-root canvas { display: block; width: 100%; height: 100%; }
+        #gameCanvas { position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none; }
 
         /* ── HUD 頂部 ── */
         #hud {
@@ -45,11 +57,11 @@
             padding: 14px 24px; justify-content: space-between; align-items: center;
             background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
         }
-        
+
         .hud-pill {
             background: rgba(255,255,255,0.12); border: 1.5px solid rgba(255,255,255,0.2);
             backdrop-filter: blur(8px); border-radius: 999px; padding: 8px 22px;
-            font-size: 20px; font-weight: 900; color: #fff; letter-spacing: 1px;
+            font-size: 20px; font-weight: 900; color: #fff; letter-spacing: 0;
             display: flex; align-items: center; gap: 8px; width: fit-content;
         }
         .hud-pill span { color: #f9ca24; }
@@ -59,13 +71,13 @@
         #tuner-container {
             display: none; /* 遊戲開始才顯示 */
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: rgba(12, 18, 40, 0.85); border: 1.5px solid rgba(255,255,255,0.2);
-            backdrop-filter: blur(8px); border-radius: 16px; padding: 12px 20px;
+            background: rgba(11, 17, 29, 0.85); border: 1.5px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(8px); border-radius: 8px; padding: 12px 20px;
             flex-direction: column; align-items: center; gap: 8px;
             box-shadow: 0 8px 20px rgba(0,0,0,0.5);
-            width: 280px; z-index: 20;
+            width: min(320px, 86vw); z-index: 20;
         }
-        .tuner-title { font-size: 13px; color: #cbd5e1; font-weight: bold; letter-spacing: 1px; }
+        .tuner-title { font-size: 13px; color: #cbd5e1; font-weight: bold; letter-spacing: 0; }
         .tuner-gauge {
             width: 100%; height: 8px; background: rgba(255,255,255,0.1);
             border-radius: 4px; position: relative; margin: 5px 0;
@@ -98,7 +110,7 @@
             transition: width 0.1s linear; box-shadow: 0 0 10px rgba(255, 107, 107, 0.8);
         }
         #fever-text {
-            display: none; font-size: 22px; font-weight: 900; color: #fff; letter-spacing: 2px;
+            display: none; font-size: 22px; font-weight: 900; color: #fff; letter-spacing: 0;
             text-shadow: 0 0 15px #ff9ff3, 0 0 30px #ff6b6b; margin-top: 8px;
             animation: bounce 0.5s infinite alternate;
         }
@@ -110,12 +122,12 @@
             z-index: 20; display: none; flex-direction: column; gap: 10px;
         }
         .note-card {
-            width: 72px; border-radius: 14px; padding: 8px 0; text-align: center;
+            width: 78px; border-radius: 8px; padding: 8px 0; text-align: center;
             font-size: 15px; font-weight: 900; color: rgba(255,255,255,0.85);
             background: rgba(255,255,255,0.08); border: 1.5px solid rgba(255,255,255,0.12);
             backdrop-filter: blur(6px); transition: transform 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
         }
-        .note-card .note-name { display: block; font-size: 17px; letter-spacing: 1px; }
+        .note-card .note-name { display: block; font-size: 17px; letter-spacing: 0; }
         .note-card .note-freq { display: block; font-size: 11px; opacity: 0.6; }
         .note-card.active { transform: scale(1.15) translateX(6px); border-color: currentColor; box-shadow: 0 0 18px currentColor; background: rgba(255,255,255,0.15); }
 
@@ -126,24 +138,37 @@
         }
         #menu-slider {
             position: absolute; top: 0; left: 0; width: 100vw; height: 300vh;
-            transform: translateY(-100vh); 
+            transform: translateY(-100vh);
             transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
         }
         .menu-page {
             width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center;
         }
         .panel {
-            background: rgba(12, 18, 40, 0.92); border: 1.5px solid rgba(255,255,255,0.1);
-            border-radius: 22px; padding: 32px 30px 28px; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            background: rgba(11, 17, 29, 0.92); border: 1.5px solid rgba(255,255,255,0.1);
+            border-radius: 8px; padding: 32px 30px 28px; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
             backdrop-filter: blur(12px); text-align: center; color: #fff; width: min(520px, 92vw);
         }
         .panel h1 { font-size: 30px; margin: 10px 0; line-height: 1.2; }
         .panel h2 { color: #f9ca24; margin-bottom: 20px; }
-        .panel h3 { margin: 22px 0 10px; font-size: 16px; letter-spacing: 1px; color: #f9ca24; }
-        
+        .panel h3 { margin: 22px 0 10px; font-size: 16px; letter-spacing: 0; color: #f9ca24; }
+        .panel-subtitle { color: #cbd5e1; font-size: 15px; line-height: 1.6; margin: 6px auto 18px; max-width: 390px; }
+        .mode-caption { display: block; font-size: 12px; font-weight: 700; opacity: 0.78; margin-top: 2px; }
+        .string-map {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+            margin: 18px auto 14px; max-width: 390px;
+        }
+        .string-chip {
+            border-radius: 8px; padding: 12px 6px;
+            background: rgba(255,255,255,0.08); border: 1.5px solid rgba(255,255,255,0.14);
+            box-shadow: inset 0 0 22px rgba(255,255,255,0.04);
+        }
+        .string-chip strong { display: block; font-size: 24px; color: var(--string-color); line-height: 1; }
+        .string-chip span { display: block; color: #cbd5e1; font-size: 11px; margin-top: 6px; }
+
         .nav-arrow {
             background: transparent; border: none; color: #cbd5e1; font-size: 16px;
-            cursor: pointer; padding: 12px; font-weight: bold; width: 100%; transition: 0.2s; letter-spacing: 2px;
+            cursor: pointer; padding: 12px; font-weight: bold; width: 100%; transition: 0.2s; letter-spacing: 0;
         }
         .nav-arrow:hover { color: #f9ca24; transform: scale(1.05); }
 
@@ -156,12 +181,12 @@
             border: none; border-radius: 999px; cursor: pointer; color: #fff;
             transition: transform 0.15s, box-shadow 0.15s, filter 0.15s; display: flex; align-items: center; gap: 8px;
         }
-        .btn-turtle { background: linear-gradient(135deg, #2ecc71, #27ae60); box-shadow: 0 6px 20px rgba(46, 204, 113, 0.35); }
-        .btn-rabbit { background: linear-gradient(135deg, #ff7675, #d63031); box-shadow: 0 6px 20px rgba(255, 118, 117, 0.35); }
+        .btn-practice { background: linear-gradient(135deg, #00b894, #0984e3); box-shadow: 0 6px 20px rgba(0, 184, 148, 0.35); }
+        .btn-challenge { background: linear-gradient(135deg, #ff7675, #f0932b); box-shadow: 0 6px 20px rgba(255, 118, 117, 0.35); }
         .btn-mode:hover { transform: scale(1.08); filter: brightness(1.1); }
 
         table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-        th { font-size: 12px; color: #718096; padding: 6px; text-transform: uppercase; letter-spacing: 1px; }
+        th { font-size: 12px; color: #718096; padding: 6px; text-transform: uppercase; letter-spacing: 0; }
         td { padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 14px; }
         tr:last-child td { border-bottom: none; }
         td.score-val { color: #f9ca24; font-weight: 900; font-size: 16px; }
@@ -171,6 +196,9 @@
             z-index: 40; display: none;
         }
         #finalScore { color: #f9ca24; font-size: 52px; font-weight: 900; display: block; margin: 10px 0; }
+        #finalReport {
+            color: #cbd5e1; font-size: 14px; line-height: 1.7; margin: 6px 0 12px;
+        }
         input[type=text] {
             padding: 10px 16px; font-size: 15px; font-family: inherit; border-radius: 999px;
             border: 1.5px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08);
@@ -186,15 +214,29 @@
         }
 
         #debug-info {
-            position: absolute; bottom: 12px; left: 12px; font-size: 12px; color: rgba(255,255,255,0.4);
+            display: none; position: absolute; bottom: 12px; left: 12px; font-size: 12px; color: rgba(255,255,255,0.4);
             z-index: 20; background: rgba(0,0,0,0.4); padding: 5px 10px; border-radius: 8px;
+        }
+
+        @media (max-width: 720px) {
+            #hud { padding: 10px; gap: 8px; flex-wrap: wrap; }
+            .hud-pill { font-size: 15px; padding: 7px 12px; }
+            #note-sidebar { left: 8px; gap: 6px; }
+            .note-card { width: 58px; font-size: 12px; }
+            .note-card .note-name { font-size: 14px; }
+            .note-card .note-freq { font-size: 10px; }
+            .panel { padding: 24px 18px; }
+            .panel h1 { font-size: 25px; }
+            .btn-mode { width: min(100%, 280px); justify-content: center; font-size: 16px; padding: 12px 18px; }
+            #fever-container { width: 70%; top: 102px; }
+            #debug-info { display: none; }
         }
     </style>
 </head>
 <body>
 
 <div id="hud">
-    <div class="hud-pill">🎵 分數 <span id="scoreDisplay">0</span></div>
+    <div class="hud-pill">🎻 分數 <span id="scoreDisplay">0</span></div>
     <div class="hud-pill" style="border-color: rgba(255, 118, 117, 0.4);">🔥 連擊 <span id="comboDisplay">0</span></div>
     <div class="hud-pill">⏱ <span id="timerDisplay">60</span></div>
 </div>
@@ -205,7 +247,7 @@
 </div>
 
 <div id="tuner-container">
-    <div class="tuner-title">🎤 直笛音準儀 (Visual Tuner)</div>
+    <div class="tuner-title">🎤 大提琴空弦音準儀</div>
     <div class="tuner-gauge">
         <div class="tuner-center-mark"></div>
         <div id="tuner-pointer"></div>
@@ -214,11 +256,10 @@
 </div>
 
 <div id="note-sidebar">
-    <div class="note-card" id="card-Sol" style="color:#f9ca24;"><span class="note-name">Sol</span><span class="note-freq">784 Hz</span></div>
-    <div class="note-card" id="card-La" style="color:#f0932b;"><span class="note-name">La</span><span class="note-freq">880 Hz</span></div>
-    <div class="note-card" id="card-Si" style="color:#eb4d4b;"><span class="note-name">Si</span><span class="note-freq">988 Hz</span></div>
-    <div class="note-card" id="card-Do" style="color:#2ecc71;"><span class="note-name">Do</span><span class="note-freq">1047 Hz</span></div>
-    <div class="note-card" id="card-Re" style="color:#9b59b6;"><span class="note-name">Re</span><span class="note-freq">1175 Hz</span></div>
+    <div class="note-card" id="card-C" style="color:#00cec9;"><span class="note-name">C 弦</span><span class="note-freq">65 Hz</span></div>
+    <div class="note-card" id="card-G" style="color:#55efc4;"><span class="note-name">G 弦</span><span class="note-freq">98 Hz</span></div>
+    <div class="note-card" id="card-D" style="color:#f9ca24;"><span class="note-name">D 弦</span><span class="note-freq">147 Hz</span></div>
+    <div class="note-card" id="card-A" style="color:#ff7675;"><span class="note-name">A 弦</span><span class="note-freq">220 Hz</span></div>
 </div>
 
 <div id="menu-viewport">
@@ -227,10 +268,10 @@
             <div class="panel">
                 <h2>📖 規則說明</h2>
                 <div style="text-align:left; font-size: 15px; color: #cbd5e1; line-height: 1.8; margin-bottom: 20px; padding: 0 10px;">
-                    <p>🎵 <b>操作方式</b>：吹出畫面顯示音高切開水果。</p>
-                    <p>🎯 <b>音準輔助</b>：畫面上方的音準儀會幫助你檢視氣流：<br><span style="color:#ff7675;">太用力偏右 (就是偏高)</span>，<span style="color:#74b9ff;">氣太弱偏左 (就是偏低)</span>。</p>
-                    <p>🔴 <b>長音機制</b>：較大顆的物件，必須穩定吹奏「長音」才能切開。</p>
-                    <p>🔥 <b>狂熱模式</b>：連續不漏接可累積能量，觸發 <b>FEVER 雙倍分數</b>！</p>
+                    <p>🎻 <b>任務</b>：看到 C、G、D、A 空弦目標，拉準並穩定一下才會出刀。</p>
+                    <p>🎯 <b>音準輔助</b>：指針偏左代表再高一點，偏右代表再低一點；進入綠色區才算有效。</p>
+                    <p>🔴 <b>長弓目標</b>：大型目標需要持續穩定演奏，外圈充滿才會切開。</p>
+                    <p>🔥 <b>Fever</b>：連續命中會累積能量，觸發後分數加倍。</p>
                 </div>
                 <button class="nav-arrow" onclick="slideMenu(1)">▼ 返回主畫面 ▼</button>
             </div>
@@ -239,13 +280,19 @@
         <div class="menu-page" id="page-main">
             <div class="panel">
                 <button class="nav-arrow" onclick="slideMenu(0)">▲ 規則說明 ▲</button>
-                
-                <h1><a href="https://www.youtube.com/@datoemusic" target="_blank" class="title-link">DatoE.</a></h1>
-                <img src="icon.jpg" alt="遊戲 Logo" style="width: 100%; max-width: 400px; max-height: 40vh; object-fit: contain; margin: 15px auto; display: block; border-radius: 20px; filter: drop-shadow(0px 10px 30px rgba(255, 255, 255, 0.25));">
-                
+
+                <h1><a href="https://www.youtube.com/@datoemusic" target="_blank" class="title-link">弦音忍者</a></h1>
+                <p class="panel-subtitle">第一章：大提琴空弦道場。先用 C、G、D、A 四條空弦，把音準、穩定度和反應練成遊戲。</p>
+                <div class="string-map" aria-label="大提琴四條空弦">
+                    <div class="string-chip" style="--string-color:#00cec9;"><strong>C</strong><span>65 Hz</span></div>
+                    <div class="string-chip" style="--string-color:#55efc4;"><strong>G</strong><span>98 Hz</span></div>
+                    <div class="string-chip" style="--string-color:#f9ca24;"><strong>D</strong><span>147 Hz</span></div>
+                    <div class="string-chip" style="--string-color:#ff7675;"><strong>A</strong><span>220 Hz</span></div>
+                </div>
+
                 <div class="btn-group">
-                    <button class="btn-mode btn-turtle" onclick="startGame('turtle')">🐢 烏龜版</button>
-                    <button class="btn-mode btn-rabbit" onclick="startGame('rabbit')">🐇 兔子版</button>
+                    <button class="btn-mode btn-practice" onclick="startGame('practice')">🌱 空弦練習 <span class="mode-caption">較慢、容許較寬</span></button>
+                    <button class="btn-mode btn-challenge" onclick="startGame('challenge')">🥷 道場挑戰 <span class="mode-caption">較快、音準較嚴</span></button>
                 </div>
 
                 <button class="nav-arrow" onclick="slideMenu(2)">▼ 排行榜 ▼</button>
@@ -265,9 +312,10 @@
 </div>
 
 <div id="gameOverOverlay" class="panel">
-    <h1>Time's up！⏱️</h1>
-    <p>你的最終分數</p>
+    <h1>練習結束！⏱️</h1>
+    <p>你的道場分數</p>
     <span id="finalScore">0</span>
+    <div id="finalReport"></div>
     <br>
     <input type="text" id="playerName" placeholder="請輸入你的名字" maxlength="10">
     <br>
@@ -275,135 +323,310 @@
     <p id="saveMsg"></p>
 </div>
 
+<div id="three-root"></div>
 <canvas id="gameCanvas"></canvas>
 <div id="debug-info">偵測音頻: --- Hz | 判定: 無</div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const threeRoot = document.getElementById('three-root');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 let score = 0, combo = 0, timeLeft = 60, fruits = [], effects = [], gameActive = false;
-let timerInterval = null, spawnTimeout = null;
+let timerInterval = null, spawnTimeout = null, animationFrameId = null;
 
 let energy = 0, isFever = false, feverTimeLeft = 0, feverInterval = null;
-let currentDifficulty = 'turtle';
+let currentMode = 'practice';
+let sessionStats = createSessionStats();
+
+const leaderboardKey = 'celloNinja_OpenStrings_v1';
+const demoMode = new URLSearchParams(window.location.search).has('demo');
+let simulatedInputMode = demoMode;
 
 const notes = [
-    { id: 'Sol', name: 'Sol', freq: 784,  color: '#f9ca24', range: 22 },
-    { id: 'La',  name: 'La',  freq: 880,  color: '#f0932b', range: 22 },
-    { id: 'Si',  name: 'Si',  freq: 988,  color: '#eb4d4b', range: 22 },
-    { id: 'Do',  name: 'Do',  freq: 1047, color: '#2ecc71', range: 22 },
-    { id: 'Re',  name: 'Re',  freq: 1175, color: '#9b59b6', range: 45 },
+    { id: 'C', name: 'C 弦', pitch: 'C2', freq: 65.41, color: '#00cec9', accent: '#81ecec', shape: 'earth' },
+    { id: 'G', name: 'G 弦', pitch: 'G2', freq: 98.00, color: '#55efc4', accent: '#00b894', shape: 'forest' },
+    { id: 'D', name: 'D 弦', pitch: 'D3', freq: 146.83, color: '#f9ca24', accent: '#f0932b', shape: 'water' },
+    { id: 'A', name: 'A 弦', pitch: 'A3', freq: 220.00, color: '#ff7675', accent: '#d63031', shape: 'sky' },
 ];
 
-let audioContext, analyser;
-const bufferLength = 2048;
-let buffer = new Float32Array(bufferLength);
-let audioInitialized = false;
-let activeSidebarCard = null;
-
-const LONG_MAX_SUSTAIN = 15;
-
-const fruitShapes = {
-    Sol: (ctx, x, y, r) => { 
-        ctx.beginPath(); ctx.ellipse(x, y, r * 0.7, r, 0, 0, Math.PI * 2); ctx.fillStyle = '#f9ca24'; ctx.fill();
-        ctx.beginPath(); ctx.ellipse(x - r * 0.2, y - r * 0.25, r * 0.25, r * 0.35, -0.4, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fill();
+const modeSettings = {
+    practice: {
+        label: '空弦練習',
+        toleranceCents: 50,
+        stableTicks: 5,
+        longTicks: 28,
+        maxFruits: 1,
+        spawnMin: 1700,
+        spawnMax: 2600,
+        speedMin: 6.2,
+        speedMax: 8.0,
+        gravity: 0.045,
+        missBreaksCombo: false,
     },
-    La: (ctx, x, y, r) => { 
-        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = '#f0932b'; ctx.fill();
-        for (let i = 0; i < 5; i++) {
-            const angle = (i / 5) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(angle) * r * 0.9, y + Math.sin(angle) * r * 0.9); ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1; ctx.stroke();
-        }
-        ctx.beginPath(); ctx.arc(x - r * 0.22, y - r * 0.28, r * 0.28, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fill();
-    },
-    Si: (ctx, x, y, r) => { 
-        ctx.beginPath(); ctx.arc(x, y + r * 0.1, r * 0.95, 0.3, Math.PI - 0.3, false); ctx.arc(x, y + r * 0.1, r * 0.95, Math.PI + 0.3, -0.3, false); ctx.fillStyle = '#eb4d4b'; ctx.fill();
-        ctx.beginPath(); ctx.moveTo(x, y - r * 0.8); ctx.quadraticCurveTo(x + r * 0.35, y - r * 1.3, x + r * 0.1, y - r * 0.85); ctx.strokeStyle = '#6ab04c'; ctx.lineWidth = 3; ctx.stroke();
-        ctx.beginPath(); ctx.arc(x - r * 0.25, y - r * 0.2, r * 0.28, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fill();
-    },
-    Do: (ctx, x, y, r) => { 
-        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI, false); ctx.lineTo(x - r, y); ctx.fillStyle = '#2ecc71'; ctx.fill();
-        ctx.beginPath(); ctx.arc(x, y, r * 0.85, 0, Math.PI, false); ctx.fillStyle = '#e74c3c'; ctx.fill();
-        ctx.fillStyle = '#000';
-        for(let i=0; i<3; i++){ ctx.beginPath(); ctx.arc(x - r*0.4 + (i*r*0.4), y + r*0.4, r*0.08, 0, Math.PI*2); ctx.fill(); }
-    },
-    Re: (ctx, x, y, r) => { 
-        const positions = [[0, 0], [-r*0.45, r*0.3], [r*0.45, r*0.3], [-r*0.22, -r*0.45], [r*0.22, -r*0.45], [0, r*0.68]];
-        for (const [dx, dy] of positions) {
-            ctx.beginPath(); ctx.arc(x + dx, y + dy, r * 0.38, 0, Math.PI * 2); ctx.fillStyle = '#9b59b6'; ctx.fill();
-            ctx.beginPath(); ctx.arc(x + dx - r*0.1, y + dy - r*0.12, r * 0.12, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fill();
-        }
+    challenge: {
+        label: '道場挑戰',
+        toleranceCents: 28,
+        stableTicks: 8,
+        longTicks: 42,
+        maxFruits: 3,
+        spawnMin: 650,
+        spawnMax: 1250,
+        speedMin: 8.8,
+        speedMax: 11.6,
+        gravity: 0.095,
+        missBreaksCombo: true,
     },
 };
+
+let audioContext, analyser;
+const bufferLength = 4096;
+let buffer = new Float32Array(bufferLength);
+let audioInitialized = false;
+let pitchInterval = null;
+let activeSidebarCard = null;
+let sidebarTimer = null;
+const MIN_INPUT_RMS = 0.025;
+
+let THREE = null;
+const threeState = {
+    ready: false,
+    scene: null,
+    camera: null,
+    renderer: null,
+    targetGroup: null,
+    effectGroup: null,
+    sparkleGroup: null,
+    loading: null,
+};
+
+const fruitShapes = {
+    C: (ctx, x, y, r) => {
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = '#00cec9'; ctx.fill();
+        ctx.beginPath(); ctx.arc(x - r * 0.25, y - r * 0.25, r * 0.24, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.24)'; ctx.fill();
+    },
+    G: (ctx, x, y, r) => {
+        ctx.beginPath(); ctx.ellipse(x, y, r * 0.82, r, 0.25, 0, Math.PI * 2); ctx.fillStyle = '#55efc4'; ctx.fill();
+        ctx.beginPath(); ctx.arc(x - r * 0.1, y - r * 0.12, r * 0.58, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 5; ctx.stroke();
+    },
+    D: (ctx, x, y, r) => {
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = '#f9ca24'; ctx.fill();
+        ctx.beginPath(); ctx.arc(x - r * 0.18, y - r * 0.28, r * 0.3, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.24)'; ctx.fill();
+    },
+    A: (ctx, x, y, r) => {
+        ctx.beginPath(); ctx.moveTo(x, y - r); ctx.bezierCurveTo(x + r, y - r * 0.6, x + r, y + r * 0.6, x, y + r); ctx.bezierCurveTo(x - r, y + r * 0.6, x - r, y - r * 0.6, x, y - r); ctx.fillStyle = '#ff7675'; ctx.fill();
+        ctx.beginPath(); ctx.arc(x - r * 0.18, y - r * 0.2, r * 0.22, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.24)'; ctx.fill();
+    },
+};
+
+function createSessionStats() {
+    return { hits: 0, longHits: 0, misses: 0, totalAbsCents: 0, bestCombo: 0 };
+}
 
 function slideMenu(pageIndex) {
     const slider = document.getElementById('menu-slider');
     slider.style.transform = `translateY(${-(pageIndex * 100)}vh)`;
-    if(pageIndex === 2) loadLeaderboard();
+    if (pageIndex === 2) loadLeaderboard();
 }
 
 function loadLeaderboard() {
-    const lb = JSON.parse(localStorage.getItem('recorderNinja_Final_v1')) || [];
+    const lb = JSON.parse(localStorage.getItem(leaderboardKey)) || [];
     const table = document.getElementById('leaderboardTable');
     table.innerHTML = '<tr><th>名次</th><th>玩家</th><th>分數</th></tr>';
-    if (lb.length === 0) { table.innerHTML += '<tr><td colspan="3" style="color:#718096;padding:14px">目前尚無成績，快來挑戰！</td></tr>'; } 
-    else { lb.forEach((entry, i) => { const icon = ['🥇','🥈','🥉'][i] || `${i+1}.`; table.innerHTML += `<tr><td>${icon}</td><td>${entry.name}</td><td class="score-val">${entry.score}</td></tr>`; }); }
+    if (lb.length === 0) {
+        table.innerHTML += '<tr><td colspan="3" style="color:#718096;padding:14px">目前尚無成績，來完成第一場空弦道場。</td></tr>';
+    } else {
+        lb.forEach((entry, i) => {
+            const icon = ['🥇','🥈','🥉'][i] || `${i + 1}.`;
+            table.innerHTML += `<tr><td>${icon}</td><td>${entry.name}</td><td class="score-val">${entry.score}</td></tr>`;
+        });
+    }
 }
 loadLeaderboard();
 
 async function startGame(mode) {
-    currentDifficulty = mode; 
-    
-    if (!audioInitialized) {
-        try {
-            let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = bufferLength * 2;
-            analyser.smoothingTimeConstant = 0.2;
-            audioContext.createMediaStreamSource(stream).connect(analyser);
-            audioInitialized = true;
-            setInterval(detectPitch, 50);
-        } catch (err) { alert('⚠️ 無法存取麥克風權限，遊戲無法開始！'); return; }
-    } else if (audioContext.state === 'suspended') { audioContext.resume(); }
+    currentMode = mode;
+    const audioReady = await initAudio();
+    if (!audioReady) return;
+    await initThreeScene();
 
     document.getElementById('menu-viewport').style.display = 'none';
+    document.getElementById('gameOverOverlay').style.display = 'none';
     document.getElementById('hud').style.display = 'flex';
     document.getElementById('note-sidebar').style.display = 'flex';
     document.getElementById('fever-container').style.display = 'block';
-    document.getElementById('tuner-container').style.display = 'flex'; // 顯示調音器
+    document.getElementById('tuner-container').style.display = 'flex';
 
-    score = 0; combo = 0; timeLeft = 60; fruits = []; effects = [];
-    energy = 0; isFever = false; document.body.classList.remove('fever-active');
+    clearRuntimeObjects();
+    score = 0; combo = 0; timeLeft = 60; energy = 0; isFever = false;
+    sessionStats = createSessionStats();
+    document.body.classList.remove('fever-active');
     document.getElementById('fever-text').style.display = 'none';
     clearInterval(feverInterval);
 
-    updateHUD(); gameActive = true; updateGame(); spawnFruitLoop();
-    timerInterval = setInterval(() => { timeLeft--; updateHUD(); if (timeLeft <= 0) endGame(); }, 1000);
+    updateHUD();
+    resetTuner();
+    gameActive = true;
+    updateGame();
+    spawnFruitLoop();
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        updateHUD();
+        if (timeLeft <= 0) endGame();
+    }, 1000);
+}
+
+async function initAudio() {
+    if (simulatedInputMode) {
+        if (!pitchInterval) pitchInterval = setInterval(detectPitch, 50);
+        audioInitialized = true;
+        return true;
+    }
+
+    if (!audioInitialized) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                }
+            });
+            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = bufferLength * 2;
+            analyser.smoothingTimeConstant = 0.18;
+            audioContext.createMediaStreamSource(stream).connect(analyser);
+            audioInitialized = true;
+            pitchInterval = setInterval(detectPitch, 50);
+        } catch (err) {
+            alert(
+                '⚠️ 無法存取麥克風權限，正式練習不會開始。\n\n' +
+                '如果你是在手機用 http://192.168... 開啟，Safari 會擋麥克風。實際音準偵測需要 HTTPS 網址。\n\n' +
+                '若只是想預覽畫面，請在網址後面加上 ?demo=1。'
+            );
+            return false;
+        }
+    } else if (audioContext && audioContext.state === 'suspended') {
+        await audioContext.resume();
+    }
+    return true;
+}
+
+async function initThreeScene() {
+    if (threeState.ready) return true;
+    if (threeState.loading) return threeState.loading;
+
+    threeState.loading = import('./vendor/three.module.min.js')
+        .then((module) => {
+            THREE = module;
+            threeState.scene = new THREE.Scene();
+            threeState.camera = new THREE.OrthographicCamera(
+                -window.innerWidth / 2, window.innerWidth / 2,
+                window.innerHeight / 2, -window.innerHeight / 2,
+                0.1, 2000
+            );
+            threeState.camera.position.set(0, 0, 1000);
+
+            threeState.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            threeState.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            threeState.renderer.setSize(window.innerWidth, window.innerHeight);
+            threeRoot.innerHTML = '';
+            threeRoot.appendChild(threeState.renderer.domElement);
+
+            threeState.targetGroup = new THREE.Group();
+            threeState.effectGroup = new THREE.Group();
+            threeState.sparkleGroup = new THREE.Group();
+            threeState.scene.add(threeState.targetGroup, threeState.effectGroup, threeState.sparkleGroup);
+
+            const keyLight = new THREE.DirectionalLight(0xffffff, 2.1);
+            keyLight.position.set(-260, 380, 520);
+            const rimLight = new THREE.DirectionalLight(0xffd166, 1.2);
+            rimLight.position.set(320, 140, 420);
+            const fillLight = new THREE.AmbientLight(0xb8fff0, 1.15);
+            threeState.scene.add(keyLight, rimLight, fillLight);
+
+            createStageSparkles();
+            threeState.ready = true;
+            renderThreeScene();
+            return true;
+        })
+        .catch((err) => {
+            console.warn('Three.js failed to load, using 2D fallback.', err);
+            threeState.ready = false;
+            return false;
+        });
+
+    return threeState.loading;
+}
+
+function createStageSparkles() {
+    if (!THREE || !threeState.sparkleGroup) return;
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.28 });
+    const geometry = new THREE.SphereGeometry(2.2, 8, 8);
+    for (let i = 0; i < 36; i++) {
+        const dot = new THREE.Mesh(geometry, material.clone());
+        dot.position.set(
+            Math.random() * window.innerWidth - window.innerWidth / 2,
+            Math.random() * window.innerHeight - window.innerHeight / 2,
+            -120 - Math.random() * 80
+        );
+        dot.userData.float = Math.random() * Math.PI * 2;
+        threeState.sparkleGroup.add(dot);
+    }
+}
+
+function clearRuntimeObjects() {
+    fruits.forEach((fruit) => fruit.dispose());
+    effects.forEach((effect) => { if (effect.dispose) effect.dispose(); });
+    fruits = [];
+    effects = [];
+    if (threeState.targetGroup) threeState.targetGroup.clear();
+    if (threeState.effectGroup) threeState.effectGroup.clear();
 }
 
 function endGame() {
-    gameActive = false; clearInterval(timerInterval); clearTimeout(spawnTimeout); clearInterval(feverInterval);
-    document.getElementById('hud').style.display = 'none'; document.getElementById('note-sidebar').style.display = 'none';
-    document.getElementById('fever-container').style.display = 'none'; document.body.classList.remove('fever-active');
-    document.getElementById('tuner-container').style.display = 'none'; // 隱藏調音器
-    
+    gameActive = false;
+    clearInterval(timerInterval);
+    clearTimeout(spawnTimeout);
+    clearInterval(feverInterval);
+    cancelAnimationFrame(animationFrameId);
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('note-sidebar').style.display = 'none';
+    document.getElementById('fever-container').style.display = 'none';
+    document.getElementById('tuner-container').style.display = 'none';
+    document.body.classList.remove('fever-active');
+
     document.getElementById('gameOverOverlay').style.display = 'block';
-    document.getElementById('finalScore').innerText = score; document.getElementById('playerName').value = '';
+    document.getElementById('finalScore').innerText = score;
+    document.getElementById('finalReport').innerHTML = buildFinalReport();
+    document.getElementById('playerName').value = '';
+}
+
+function buildFinalReport() {
+    const avgCents = sessionStats.hits ? Math.round(sessionStats.totalAbsCents / sessionStats.hits) : 0;
+    return `
+        命中 ${sessionStats.hits} 個目標｜長弓 ${sessionStats.longHits} 次<br>
+        平均音準偏差 ${avgCents} cents｜最高連擊 ${sessionStats.bestCombo}
+    `;
 }
 
 document.getElementById('saveScoreBtn').addEventListener('click', () => {
-    let name = document.getElementById('playerName').value.trim() || '無名英雄';
-    let lb = JSON.parse(localStorage.getItem('recorderNinja_Final_v1')) || [];
-    lb.push({ name, score }); lb.sort((a, b) => b.score - a.score);
-    localStorage.setItem('recorderNinja_Final_v1', JSON.stringify(lb.slice(0, 5)));
+    const name = document.getElementById('playerName').value.trim() || '無名忍者';
+    const lb = JSON.parse(localStorage.getItem(leaderboardKey)) || [];
+    lb.push({ name, score, mode: modeSettings[currentMode].label, date: new Date().toISOString() });
+    lb.sort((a, b) => b.score - a.score);
+    localStorage.setItem(leaderboardKey, JSON.stringify(lb.slice(0, 5)));
     document.getElementById('saveMsg').innerText = '✓ 儲存成功！返回中…';
     setTimeout(() => {
+        clearRuntimeObjects();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        renderThreeScene();
         document.getElementById('gameOverOverlay').style.display = 'none';
         document.getElementById('menu-viewport').style.display = 'block';
-        slideMenu(1); 
+        slideMenu(1);
         document.getElementById('saveMsg').innerText = '';
     }, 1500);
 });
@@ -419,47 +642,96 @@ function updateHUD() {
 }
 
 function startFever() {
-    isFever = true; feverTimeLeft = 10;
+    isFever = true;
+    feverTimeLeft = 10;
     document.body.classList.add('fever-active');
     document.getElementById('fever-text').style.display = 'block';
     clearInterval(feverInterval);
     feverInterval = setInterval(() => {
-        feverTimeLeft -= 0.1; energy = (feverTimeLeft / 10) * 100; updateHUD();
+        feverTimeLeft -= 0.1;
+        energy = (feverTimeLeft / 10) * 100;
+        updateHUD();
         if (feverTimeLeft <= 0) endFever();
     }, 100);
 }
 
 function endFever() {
-    clearInterval(feverInterval); isFever = false; energy = 0;
-    document.body.classList.remove('fever-active'); document.getElementById('fever-text').style.display = 'none';
+    clearInterval(feverInterval);
+    isFever = false;
+    energy = 0;
+    document.body.classList.remove('fever-active');
+    document.getElementById('fever-text').style.display = 'none';
     updateHUD();
 }
 
 function autoCorrelate(buf, sampleRate) {
-    let SIZE = buf.length, rms = 0;
-    for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
-    rms = Math.sqrt(rms / SIZE);
-    if (rms < 0.02) return -1;
-    let r1 = 0, r2 = SIZE - 1, thres = 0.2;
-    for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
-    for (let i = 1; i < SIZE / 2; i++) if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
-    buf = buf.slice(r1, r2); SIZE = buf.length;
-    let c = new Array(SIZE).fill(0);
-    for (let i = 0; i < SIZE; i++) for (let j = 0; j < SIZE - i; j++) c[i] += buf[j] * buf[j + i];
-    let d = 0; while (c[d] > c[d + 1]) d++;
+    let size = buf.length, rms = 0;
+    for (let i = 0; i < size; i++) rms += buf[i] * buf[i];
+    rms = Math.sqrt(rms / size);
+    if (rms < MIN_INPUT_RMS) return -1;
+
+    let r1 = 0, r2 = size - 1, thres = 0.2;
+    for (let i = 0; i < size / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+    for (let i = 1; i < size / 2; i++) if (Math.abs(buf[size - i]) < thres) { r2 = size - i; break; }
+    buf = buf.slice(r1, r2);
+    size = buf.length;
+
+    const c = new Array(size).fill(0);
+    for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size - i; j++) c[i] += buf[j] * buf[j + i];
+    }
+
+    let d = 0;
+    while (c[d] > c[d + 1]) d++;
     let maxval = -1, maxpos = -1;
-    for (let i = d; i < SIZE; i++) if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
-    if (maxpos < 20 || maxpos > 1000) return -1;
+    for (let i = d; i < size; i++) {
+        if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+    }
+    if (maxpos < 20 || maxpos > 1800) return -1;
+
+    const x1 = c[maxpos - 1] || 0;
+    const x2 = c[maxpos];
+    const x3 = c[maxpos + 1] || 0;
+    const a = (x1 + x3 - 2 * x2) / 2;
+    const b = (x3 - x1) / 2;
+    if (a) maxpos = maxpos - b / (2 * a);
+
     return sampleRate / maxpos;
 }
 
-let sidebarTimer = null;
-function highlightSidebar(noteName) {
+function centsBetween(freq, targetFreq) {
+    return 1200 * Math.log2(freq / targetFreq);
+}
+
+function foldedCents(freq, targetFreq) {
+    const candidates = [0.5, 1, 2].map((factor) => centsBetween(freq, targetFreq * factor));
+    return candidates.reduce((best, val) => Math.abs(val) < Math.abs(best) ? val : best, candidates[0]);
+}
+
+function findClosestNote(freq) {
+    let closest = null;
+    let cents = Infinity;
+    for (const note of notes) {
+        const noteCents = foldedCents(freq, note.freq);
+        if (Math.abs(noteCents) < Math.abs(cents)) {
+            closest = note;
+            cents = noteCents;
+        }
+    }
+    return closest ? { note: closest, cents } : null;
+}
+
+function highlightSidebar(noteId) {
     if (activeSidebarCard) activeSidebarCard.classList.remove('active');
-    const card = document.getElementById('card-' + noteName);
-    if (card) { card.classList.add('active'); activeSidebarCard = card; }
+    const card = document.getElementById('card-' + noteId);
+    if (card) {
+        card.classList.add('active');
+        activeSidebarCard = card;
+    }
     clearTimeout(sidebarTimer);
-    sidebarTimer = setTimeout(() => { if (activeSidebarCard) activeSidebarCard.classList.remove('active'); }, 400);
+    sidebarTimer = setTimeout(() => {
+        if (activeSidebarCard) activeSidebarCard.classList.remove('active');
+    }, 450);
 }
 
 function resetTuner() {
@@ -467,205 +739,419 @@ function resetTuner() {
     const label = document.getElementById('tuner-label');
     pointer.style.left = '50%';
     pointer.style.borderBottomColor = '#cbd5e1';
-    label.innerText = '等待吹奏...';
+    label.innerText = '等待演奏...';
     label.style.color = '#cbd5e1';
 }
 
 function detectPitch() {
     if (!gameActive || !audioInitialized) return;
+    const detection = simulatedInputMode ? getDemoDetection() : getMicrophoneDetection();
+    updateTuner(detection);
+    processHits(detection);
+}
+
+function getMicrophoneDetection() {
     analyser.getFloatTimeDomainData(buffer);
-    let freq = autoCorrelate(buffer, audioContext.sampleRate);
-    
-    let detectedNoteId = null; 
-    let detectedNoteName = "無";
+    const freq = autoCorrelate(buffer, audioContext.sampleRate);
+    if (freq === -1) return null;
 
-    if (freq !== -1) {
-        let closestNote = null;
-        let minDiff = Infinity;
-        for (let note of notes) {
-            let diff = Math.abs(freq - note.freq);
-            if (diff < minDiff) {
-                minDiff = diff;
-                closestNote = note;
-            }
-        }
+    const closest = findClosestNote(freq);
+    if (!closest || Math.abs(closest.cents) > 170) {
+        document.getElementById('debug-info').innerText = `偵測音頻: ${Math.round(freq)} Hz | 判定: 無`;
+        return { freq, note: null, cents: 0, accepted: false };
+    }
 
-        if (closestNote && minDiff < 100) { 
-            let cents = 1200 * Math.log2(freq / closestNote.freq);
-            let pointerPos = 50 + cents; 
-            pointerPos = Math.max(0, Math.min(100, pointerPos));
-            
-            const pointer = document.getElementById('tuner-pointer');
-            const label = document.getElementById('tuner-label');
-            pointer.style.left = pointerPos + '%';
+    const setting = modeSettings[currentMode];
+    const accepted = Math.abs(closest.cents) <= setting.toleranceCents;
+    document.getElementById('debug-info').innerText = `偵測音頻: ${Math.round(freq)} Hz | 判定: ${accepted ? closest.note.name : '接近 ' + closest.note.name}`;
+    return { freq, note: closest.note, cents: closest.cents, accepted };
+}
 
-            if (Math.abs(cents) < 15) {
-                label.innerText = `音準完美 (${closestNote.name})`;
-                label.style.color = '#2ecc71';
-                pointer.style.borderBottomColor = '#2ecc71';
-            } else if (cents > 0) {
-                label.innerText = `太用力 (偏高) 💨`;
-                label.style.color = '#ff7675';
-                pointer.style.borderBottomColor = '#ff7675';
-            } else {
-                label.innerText = `氣太弱 (偏低) 🌬️`;
-                label.style.color = '#74b9ff';
-                pointer.style.borderBottomColor = '#74b9ff';
-            }
+function getDemoDetection() {
+    const target = fruits.find((fruit) => fruit.active) || null;
+    if (!target) return null;
+    const drift = Math.sin(performance.now() / 360) * (modeSettings[currentMode].toleranceCents * 0.34);
+    const freq = target.note.freq * Math.pow(2, drift / 1200);
+    return { freq, note: target.note, cents: drift, accepted: true };
+}
 
-            if (minDiff < closestNote.range) {
-                detectedNoteId = closestNote.id; 
-                detectedNoteName = closestNote.name;
-                highlightSidebar(closestNote.name);
-            }
-        } else {
-            resetTuner();
-        }
-        
-        document.getElementById('debug-info').innerText = `偵測音頻: ${Math.round(freq)} Hz | 判定: ${detectedNoteName}`;
-    } else { 
+function updateTuner(detection) {
+    if (!detection || !detection.note) {
         resetTuner();
-        document.getElementById('debug-info').innerText = `偵測音頻: --- Hz | 判定: 無`; 
+        if (!detection) document.getElementById('debug-info').innerText = '偵測音頻: --- Hz | 判定: 無';
+        return;
     }
-    processHits(detectedNoteId);
+
+    const pointer = document.getElementById('tuner-pointer');
+    const label = document.getElementById('tuner-label');
+    const displayRange = 90;
+    const pointerPos = Math.max(0, Math.min(100, 50 + (detection.cents / displayRange) * 50));
+    pointer.style.left = pointerPos + '%';
+
+    if (Math.abs(detection.cents) <= 8) {
+        label.innerText = `正中 ${detection.note.name} (${detection.note.pitch})`;
+        label.style.color = '#2ecc71';
+        pointer.style.borderBottomColor = '#2ecc71';
+    } else if (detection.cents > 0) {
+        label.innerText = `偏高，再低一點 (${detection.note.name})`;
+        label.style.color = '#ff7675';
+        pointer.style.borderBottomColor = '#ff7675';
+    } else {
+        label.innerText = `偏低，再高一點 (${detection.note.name})`;
+        label.style.color = '#74b9ff';
+        pointer.style.borderBottomColor = '#74b9ff';
+    }
+
+    if (detection.accepted) highlightSidebar(detection.note.id);
 }
 
-function processHits(playedNoteId) {
+function processHits(detection) {
+    const setting = modeSettings[currentMode];
     let currentTarget = null;
-    if (playedNoteId) {
-        for (let i = 0; i < fruits.length; i++) {
-            let f = fruits[i];
-            if (f.active && f.note.id === playedNoteId && f.y > 50 && f.y < canvas.height) { currentTarget = f; break; }
+    if (detection && detection.note && detection.accepted) {
+        for (const fruit of fruits) {
+            if (fruit.active && fruit.note.id === detection.note.id && fruit.y > 40 && fruit.y < canvas.height - 18) {
+                currentTarget = fruit;
+                break;
+            }
         }
     }
 
-    for (let i = 0; i < fruits.length; i++) {
-        let f = fruits[i];
-        if (!f.active) continue;
+    for (const fruit of fruits) {
+        if (!fruit.active) continue;
 
-        if (f.isLong) {
-            if (f === currentTarget) {
-                f.sustain++;
-                if (f.sustain >= LONG_MAX_SUSTAIN) triggerFruitHit(f);
-            } else { if (f.sustain > 0) f.sustain--; } 
-        } else {
-            if (f === currentTarget) triggerFruitHit(f);
+        if (fruit === currentTarget) {
+            fruit.sustain++;
+            fruit.bestAbsCents = Math.min(fruit.bestAbsCents, Math.abs(detection.cents));
+            const needed = fruit.isLong ? fruit.requiredSustain : setting.stableTicks;
+            if (fruit.sustain >= needed) triggerFruitHit(fruit);
+        } else if (fruit.sustain > 0) {
+            fruit.sustain = currentMode === 'practice' ? Math.max(0, fruit.sustain - 1) : Math.max(0, fruit.sustain - 3);
         }
     }
 }
 
-function triggerFruitHit(f) {
-    f.active = false;
+function triggerFruitHit(fruit) {
+    fruit.active = false;
     combo++;
-    let baseScore = f.isLong ? 20 : 10;
-    let multiplier = isFever ? 2 : 1;
-    let earned = (baseScore + (combo - 1) * 5) * multiplier; 
+    sessionStats.hits++;
+    sessionStats.bestCombo = Math.max(sessionStats.bestCombo, combo);
+    if (fruit.isLong) sessionStats.longHits++;
+    sessionStats.totalAbsCents += Number.isFinite(fruit.bestAbsCents) ? fruit.bestAbsCents : modeSettings[currentMode].toleranceCents;
+
+    const setting = modeSettings[currentMode];
+    const accuracyRatio = Math.max(0, 1 - (fruit.bestAbsCents / setting.toleranceCents));
+    const technicalScore = fruit.isLong ? 70 : 45;
+    const accuracyScore = Math.round(accuracyRatio * 35);
+    const comboBonus = Math.min(40, (combo - 1) * 4);
+    const multiplier = isFever ? 2 : 1;
+    const earned = (technicalScore + accuracyScore + comboBonus) * multiplier;
     score += earned;
-    
+
     if (!isFever) {
-        energy += (f.isLong ? 15 : 10);
+        energy += fruit.isLong ? 18 : 11;
         if (energy >= 100) { energy = 100; startFever(); }
     }
-    
+
+    fruit.dispose();
+    effects.push(new SlashEffect(fruit.x, fruit.y, fruit.note.color));
+    effects.push(new ThreeSliceEffect(fruit.x, fruit.y, fruit.note, fruit.radius));
+    effects.push(new ScorePopup(fruit.x, fruit.y, earned, isFever));
     updateHUD();
-    effects.push(new SlashEffect(f.x, f.y, f.note.color));
-    effects.push(new ScorePopup(f.x, f.y, earned, isFever));
 }
 
 class SlashEffect {
     constructor(x, y, color) {
-        this.x = x; this.y = y; this.color = color;
-        this.life = 22; this.maxLife = 22; this.angle = Math.random() * Math.PI; this.len = 110 + Math.random() * 30;
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.life = 22;
+        this.maxLife = 22;
+        this.angle = Math.random() * Math.PI;
+        this.len = 120 + Math.random() * 40;
     }
     update() { this.life--; }
     draw() {
         if (this.life <= 0) return;
         const t = this.life / this.maxLife;
-        ctx.save(); ctx.globalAlpha = t; ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+        ctx.save();
+        ctx.globalAlpha = t;
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
         const grad = ctx.createLinearGradient(-this.len, 0, this.len, 0);
-        grad.addColorStop(0, 'transparent'); grad.addColorStop(0.5, this.color); grad.addColorStop(1, 'transparent');
-        ctx.strokeStyle = grad; ctx.lineWidth = 18 * t; ctx.beginPath(); ctx.moveTo(-this.len, 0); ctx.lineTo(this.len, 0); ctx.stroke();
-        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 4 * t; ctx.beginPath(); ctx.moveTo(-this.len * 0.8, 0); ctx.lineTo(this.len * 0.8, 0); ctx.stroke();
+        grad.addColorStop(0, 'transparent');
+        grad.addColorStop(0.5, this.color);
+        grad.addColorStop(1, 'transparent');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 18 * t;
+        ctx.beginPath();
+        ctx.moveTo(-this.len, 0);
+        ctx.lineTo(this.len, 0);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 4 * t;
+        ctx.beginPath();
+        ctx.moveTo(-this.len * 0.8, 0);
+        ctx.lineTo(this.len * 0.8, 0);
+        ctx.stroke();
         ctx.restore();
     }
 }
 
 class ScorePopup {
     constructor(x, y, val, fever) {
-        this.x = x + (Math.random() - 0.5) * 30; this.y = y; this.val = val; this.life = 40; this.maxLife = 40; this.fever = fever;
+        this.x = x + (Math.random() - 0.5) * 30;
+        this.y = y;
+        this.val = val;
+        this.life = 44;
+        this.maxLife = 44;
+        this.fever = fever;
     }
-    update() { this.y -= 1.5; this.life--; }
+    update() {
+        this.y -= 1.5;
+        this.life--;
+    }
     draw() {
         if (this.life <= 0) return;
         const t = this.life / this.maxLife;
-        ctx.save(); ctx.globalAlpha = t; 
+        const numeric = typeof this.val === 'number';
+        ctx.save();
+        ctx.globalAlpha = t;
         ctx.font = `bold ${this.fever ? 36 : 28}px Nunito, sans-serif`;
-        ctx.fillStyle = this.fever ? '#ff9ff3' : (this.val >= 30 ? '#ff7675' : '#f9ca24'); 
+        ctx.fillStyle = this.fever ? '#ff9ff3' : (numeric && this.val >= 90 ? '#ff7675' : '#f9ca24');
         if (this.fever) { ctx.shadowBlur = 10; ctx.shadowColor = '#ff6b6b'; }
-        ctx.textAlign = 'center'; ctx.fillText(`+${this.val}`, this.x, this.y); ctx.restore();
+        ctx.textAlign = 'center';
+        ctx.fillText(numeric ? `+${this.val}` : this.val, this.x, this.y);
+        ctx.restore();
+    }
+}
+
+class ThreeSliceEffect {
+    constructor(x, y, note, radius) {
+        this.life = 48;
+        this.maxLife = 48;
+        this.parts = [];
+        if (!THREE || !threeState.ready || !threeState.effectGroup) return;
+
+        const colors = [note.color, note.accent, '#ffffff'];
+        for (let i = 0; i < 10; i++) {
+            const size = radius * (0.12 + Math.random() * 0.18);
+            const geometry = i < 2
+                ? new THREE.SphereGeometry(radius * 0.38, 18, 12)
+                : new THREE.TetrahedronGeometry(size, 0);
+            const material = new THREE.MeshStandardMaterial({
+                color: colors[i % colors.length],
+                emissive: note.color,
+                emissiveIntensity: i < 2 ? 0.14 : 0.28,
+                roughness: 0.5,
+                metalness: 0.04,
+                transparent: true,
+                opacity: 0.95,
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(toWorldX(x), toWorldY(y), 12 + Math.random() * 40);
+            mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+            mesh.userData.velocity = {
+                x: (Math.random() - 0.5) * 7 + (i % 2 === 0 ? -2.4 : 2.4),
+                y: 3 + Math.random() * 4,
+                z: (Math.random() - 0.5) * 3,
+                r: (Math.random() - 0.5) * 0.18,
+            };
+            threeState.effectGroup.add(mesh);
+            this.parts.push(mesh);
+        }
+    }
+    update() {
+        this.life--;
+        for (const part of this.parts) {
+            const v = part.userData.velocity;
+            part.position.x += v.x;
+            part.position.y += v.y;
+            part.position.z += v.z;
+            v.y -= 0.18;
+            part.rotation.x += v.r;
+            part.rotation.y += v.r * 0.7;
+            part.material.opacity = Math.max(0, this.life / this.maxLife);
+        }
+    }
+    draw() {}
+    dispose() {
+        if (!threeState.effectGroup) return;
+        this.parts.forEach((part) => {
+            threeState.effectGroup.remove(part);
+            part.geometry.dispose();
+            part.material.dispose();
+        });
     }
 }
 
 class Fruit {
     constructor() {
-        this.x = Math.random() * (canvas.width - 320) + 160;
-        this.y = canvas.height + 55;
-        this.vx = (Math.random() - 0.5) * 2.5;
-        
-        if (currentDifficulty === 'turtle') {
-            this.vy = -(Math.random() * 2 + 7.5); 
-            this.gravity = 0.05; 
-        } else {
-            this.vy = -(Math.random() * 3 + 10); 
-            this.gravity = 0.12; 
-        }
-        
+        const margin = Math.min(180, Math.max(96, canvas.width * 0.13));
+        this.x = Math.random() * Math.max(80, canvas.width - margin * 2) + margin;
+        this.y = canvas.height + 64;
+        this.vx = (Math.random() - 0.5) * 2.6;
+
+        const setting = modeSettings[currentMode];
+        this.vy = -(Math.random() * (setting.speedMax - setting.speedMin) + setting.speedMin);
+        this.gravity = setting.gravity;
+
         this.note = notes[Math.floor(Math.random() * notes.length)];
-        this.isLong = Math.random() < 0.3;
-        this.radius = this.isLong ? 55 : 40; 
+        this.isLong = Math.random() < (currentMode === 'practice' ? 0.34 : 0.26);
+        this.radius = this.isLong ? 58 : 42;
+        this.requiredSustain = this.isLong ? setting.longTicks : setting.stableTicks;
         this.active = true;
         this.rotation = Math.random() * Math.PI * 2;
-        this.rotSpeed = (Math.random() - 0.5) * 0.04;
-        this.sustain = 0; 
+        this.rotSpeed = (Math.random() - 0.5) * 0.05;
+        this.sustain = 0;
+        this.bestAbsCents = Infinity;
+        this.mesh = createTargetMesh(this.note, this.radius, this.isLong);
+        this.syncMesh();
     }
     update() {
-        this.x += this.vx; this.y += this.vy; this.vy += this.gravity; this.rotation += this.rotSpeed;
-        if (this.x < 80 || this.x > canvas.width - 80) this.vx *= -1;
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += this.gravity;
+        this.rotation += this.rotSpeed;
+        if (this.x < 72 || this.x > canvas.width - 72) this.vx *= -1;
+        this.syncMesh();
+    }
+    syncMesh() {
+        if (!this.mesh) return;
+        this.mesh.position.set(toWorldX(this.x), toWorldY(this.y), 0);
+        this.mesh.rotation.y = this.rotation;
+        this.mesh.rotation.z = this.rotation * 0.28;
+        const pulse = this.isLong ? 1 + Math.sin(performance.now() / 180) * 0.035 : 1;
+        this.mesh.scale.setScalar(pulse);
     }
     draw() {
         const r = this.radius;
-        ctx.save(); ctx.translate(this.x, this.y);
+        const progress = Math.min(1, this.sustain / this.requiredSustain);
 
-        if (this.isLong && this.sustain > 0) {
-            ctx.beginPath(); let progress = this.sustain / LONG_MAX_SUSTAIN;
-            ctx.arc(0, 0, r + 12, -Math.PI/2, -Math.PI/2 + (Math.PI * 2 * progress));
-            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.stroke();
-            ctx.shadowBlur = 25; ctx.shadowColor = '#ffffff';
-        } else { ctx.shadowBlur = 18; ctx.shadowColor = this.note.color; }
-
-        ctx.rotate(this.rotation);
-        
-        const shapeFn = fruitShapes[this.note.id]; 
-        if (shapeFn) shapeFn(ctx, 0, 0, r);
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        if (!threeState.ready || !this.mesh) {
+            ctx.rotate(this.rotation);
+            const shapeFn = fruitShapes[this.note.id];
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = this.note.color;
+            if (shapeFn) shapeFn(ctx, 0, 0, r);
+            ctx.rotate(-this.rotation);
+        }
 
         ctx.shadowBlur = 0;
-        ctx.rotate(-this.rotation); 
-        
-        ctx.font = `bold ${this.isLong ? 26 : 18}px Nunito, sans-serif`;
-        ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.shadowBlur = 6; ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.fillText(this.note.name, 0, 0); ctx.shadowBlur = 0;
-        
+        if (this.isLong || this.sustain > 0) {
+            ctx.beginPath();
+            ctx.arc(0, 0, r + 15, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * progress));
+            ctx.strokeStyle = this.isLong ? '#ffffff' : this.note.color;
+            ctx.lineWidth = this.isLong ? 6 : 4;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+
+        ctx.font = `bold ${this.isLong ? 22 : 18}px Nunito, sans-serif`;
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(0,0,0,0.75)';
+        ctx.fillText(this.note.name, 0, -4);
+        ctx.font = 'bold 12px Nunito, sans-serif';
+        ctx.fillText(this.note.pitch, 0, 18);
+        ctx.shadowBlur = 0;
         ctx.restore();
     }
+    dispose() {
+        if (this.mesh && threeState.targetGroup) {
+            disposeObject3D(this.mesh);
+            threeState.targetGroup.remove(this.mesh);
+            this.mesh = null;
+        }
+    }
+}
+
+function createTargetMesh(note, radius, isLong) {
+    if (!THREE || !threeState.ready || !threeState.targetGroup) return null;
+
+    const group = new THREE.Group();
+    const material = new THREE.MeshStandardMaterial({
+        color: note.color,
+        emissive: note.color,
+        emissiveIntensity: 0.12,
+        roughness: 0.36,
+        metalness: 0.08,
+    });
+
+    let geometry;
+    if (note.shape === 'forest') geometry = new THREE.IcosahedronGeometry(radius, 2);
+    else if (note.shape === 'water') geometry = new THREE.SphereGeometry(radius, 34, 22);
+    else if (note.shape === 'sky') geometry = new THREE.OctahedronGeometry(radius, 2);
+    else geometry = new THREE.DodecahedronGeometry(radius, 2);
+
+    const body = new THREE.Mesh(geometry, material);
+    body.scale.z = 0.72;
+    group.add(body);
+
+    const ringGeo = new THREE.TorusGeometry(radius * 0.72, isLong ? 4.5 : 3.2, 12, 56);
+    const ringMat = new THREE.MeshStandardMaterial({
+        color: note.accent,
+        emissive: note.accent,
+        emissiveIntensity: 0.22,
+        roughness: 0.5,
+        metalness: 0.06,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.z = 8;
+    group.add(ring);
+
+    const stemGeo = new THREE.CylinderGeometry(radius * 0.06, radius * 0.08, radius * 0.55, 12);
+    const stemMat = new THREE.MeshStandardMaterial({ color: 0x7f5539, roughness: 0.7 });
+    const stem = new THREE.Mesh(stemGeo, stemMat);
+    stem.position.set(radius * 0.18, radius * 0.76, 4);
+    stem.rotation.z = -0.28;
+    group.add(stem);
+
+    const glow = new THREE.PointLight(note.color, isLong ? 1.4 : 0.9, radius * 5);
+    glow.position.set(0, 0, radius * 1.2);
+    group.add(glow);
+
+    threeState.targetGroup.add(group);
+    return group;
+}
+
+function disposeObject3D(object) {
+    object.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+            if (Array.isArray(child.material)) child.material.forEach((mat) => mat.dispose());
+            else child.material.dispose();
+        }
+    });
+}
+
+function toWorldX(x) { return x - window.innerWidth / 2; }
+function toWorldY(y) { return window.innerHeight / 2 - y; }
+
+function renderThreeScene() {
+    if (!threeState.ready || !threeState.renderer) return;
+    if (threeState.sparkleGroup) {
+        threeState.sparkleGroup.children.forEach((dot, i) => {
+            dot.userData.float += 0.01 + i * 0.00004;
+            dot.position.y += Math.sin(dot.userData.float) * 0.06;
+            dot.material.opacity = 0.16 + Math.sin(dot.userData.float) * 0.09;
+        });
+    }
+    threeState.renderer.render(threeState.scene, threeState.camera);
 }
 
 function spawnFruitLoop() {
     if (!gameActive) return;
-    
-    const maxFruits = currentDifficulty === 'turtle' ? 2 : 4;
-    if (fruits.length < maxFruits) fruits.push(new Fruit());
-    
-    let delay = currentDifficulty === 'turtle' ? (Math.random() * 1500 + 1200) : (Math.random() * 800 + 500);
+
+    const setting = modeSettings[currentMode];
+    if (fruits.length < setting.maxFruits) fruits.push(new Fruit());
+
+    const delay = Math.random() * (setting.spawnMax - setting.spawnMin) + setting.spawnMin;
     spawnTimeout = setTimeout(spawnFruitLoop, delay);
 }
 
@@ -673,25 +1159,61 @@ function updateGame() {
     if (!gameActive) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    for (let i = effects.length - 1; i >= 0; i--) {
-        effects[i].update(); effects[i].draw();
-        if (effects[i].life <= 0) effects.splice(i, 1);
-    }
-    
     for (let i = fruits.length - 1; i >= 0; i--) {
-        let f = fruits[i];
-        if (f.active) {
-            f.update(); f.draw();
-            if (f.y > canvas.height + 100) {
-                if (combo > 0) effects.push(new ScorePopup(f.x, canvas.height - 50, "Miss!", false)); 
-                combo = 0; updateHUD(); fruits.splice(i, 1);
+        const fruit = fruits[i];
+        if (fruit.active) {
+            fruit.update();
+            if (fruit.y > canvas.height + 110) {
+                handleMiss(fruit);
+                fruit.dispose();
+                fruits.splice(i, 1);
             }
-        } else { fruits.splice(i, 1); }
+        } else {
+            fruit.dispose();
+            fruits.splice(i, 1);
+        }
     }
-    requestAnimationFrame(updateGame);
+
+    renderThreeScene();
+
+    for (const fruit of fruits) fruit.draw();
+
+    for (let i = effects.length - 1; i >= 0; i--) {
+        effects[i].update();
+        effects[i].draw();
+        if (effects[i].life <= 0) {
+            if (effects[i].dispose) effects[i].dispose();
+            effects.splice(i, 1);
+        }
+    }
+
+    animationFrameId = requestAnimationFrame(updateGame);
 }
 
-window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+function handleMiss(fruit) {
+    sessionStats.misses++;
+    effects.push(new ScorePopup(fruit.x, canvas.height - 56, 'MISS', false));
+    if (modeSettings[currentMode].missBreaksCombo) combo = 0;
+    updateHUD();
+}
+
+function resizeGame() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    if (threeState.ready && threeState.camera && threeState.renderer) {
+        threeState.camera.left = -window.innerWidth / 2;
+        threeState.camera.right = window.innerWidth / 2;
+        threeState.camera.top = window.innerHeight / 2;
+        threeState.camera.bottom = -window.innerHeight / 2;
+        threeState.camera.updateProjectionMatrix();
+        threeState.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    renderThreeScene();
+}
+
+window.addEventListener('resize', resizeGame);
+window.startGame = startGame;
+window.slideMenu = slideMenu;
 </script>
 </body>
 </html>
