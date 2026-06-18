@@ -94,6 +94,21 @@
             transform: translateX(-50%); transition: left 0.1s ease-out, border-bottom-color 0.1s;
         }
         #tuner-label { font-size: 15px; font-weight: 900; color: #cbd5e1; min-height: 20px; }
+        .mic-panel {
+            width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+            gap: 8px; color: #cbd5e1; font-size: 11px; font-weight: 800;
+        }
+        .mic-meter {
+            height: 7px; border-radius: 999px; overflow: hidden;
+            background: rgba(255,255,255,0.12); box-shadow: inset 0 0 4px rgba(0,0,0,0.45);
+        }
+        #mic-meter-fill {
+            width: 0%; height: 100%; border-radius: inherit;
+            background: linear-gradient(90deg, #00cec9, #f9ca24, #ff7675);
+            transition: width 0.08s linear;
+        }
+        #mic-status { color: #74b9ff; min-height: 14px; }
+        #mic-rms { color: rgba(255,255,255,0.7); font-variant-numeric: tabular-nums; }
 
         /* ── 能量條 (正中間) ── */
         #fever-container {
@@ -253,6 +268,11 @@
         <div id="tuner-pointer"></div>
     </div>
     <div id="tuner-label">等待吹奏...</div>
+    <div class="mic-panel" aria-label="麥克風輸入音量">
+        <span id="mic-status">未授權</span>
+        <div class="mic-meter"><div id="mic-meter-fill"></div></div>
+        <span id="mic-rms">0.000</span>
+    </div>
 </div>
 
 <div id="note-sidebar">
@@ -388,7 +408,12 @@ let audioInitialized = false;
 let pitchInterval = null;
 let activeSidebarCard = null;
 let sidebarTimer = null;
-const MIN_INPUT_RMS = 0.025;
+const BASE_INPUT_RMS = 0.008;
+let inputGateRms = BASE_INPUT_RMS;
+let currentInputRms = 0;
+let noiseSamples = [];
+let noiseCalibrationStartedAt = 0;
+let micStatus = '未授權';
 
 let THREE = null;
 const threeState = {
@@ -450,6 +475,11 @@ async function startGame(mode) {
     currentMode = mode;
     const audioReady = await initAudio();
     if (!audioReady) return;
+    if (!simulatedInputMode) {
+        resetNoiseCalibration();
+        micStatus = '已授權';
+        updateMicMeter(0);
+    }
     await initThreeScene();
 
     document.getElementById('menu-viewport').style.display = 'none';
@@ -482,6 +512,8 @@ async function initAudio() {
     if (simulatedInputMode) {
         if (!pitchInterval) pitchInterval = setInterval(detectPitch, 50);
         audioInitialized = true;
+        micStatus = 'Demo 模式';
+        updateMicMeter(0);
         return true;
     }
 
@@ -495,13 +527,19 @@ async function initAudio() {
                 }
             });
             audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+            if (audioContext.state === 'suspended') await audioContext.resume();
             analyser = audioContext.createAnalyser();
             analyser.fftSize = bufferLength * 2;
             analyser.smoothingTimeConstant = 0.18;
             audioContext.createMediaStreamSource(stream).connect(analyser);
             audioInitialized = true;
+            resetNoiseCalibration();
+            micStatus = '已授權';
+            updateMicMeter(0);
             pitchInterval = setInterval(detectPitch, 50);
         } catch (err) {
+            micStatus = '未授權';
+            updateMicMeter(0);
             alert(
                 '⚠️ 無法存取麥克風權限，正式練習不會開始。\n\n' +
                 '如果你是在手機用 http://192.168... 開啟，Safari 會擋麥克風。實際音準偵測需要 HTTPS 網址。\n\n' +
@@ -511,6 +549,7 @@ async function initAudio() {
         }
     } else if (audioContext && audioContext.state === 'suspended') {
         await audioContext.resume();
+        micStatus = '已授權';
     }
     return true;
 }
@@ -664,11 +703,48 @@ function endFever() {
     updateHUD();
 }
 
-function autoCorrelate(buf, sampleRate) {
+function getRms(buf) {
     let size = buf.length, rms = 0;
     for (let i = 0; i < size; i++) rms += buf[i] * buf[i];
-    rms = Math.sqrt(rms / size);
-    if (rms < MIN_INPUT_RMS) return -1;
+    return Math.sqrt(rms / size);
+}
+
+function resetNoiseCalibration() {
+    inputGateRms = BASE_INPUT_RMS;
+    currentInputRms = 0;
+    noiseSamples = [];
+    noiseCalibrationStartedAt = performance.now();
+}
+
+function updateNoiseGate(rms) {
+    if (!noiseCalibrationStartedAt) return;
+    const elapsed = performance.now() - noiseCalibrationStartedAt;
+    if (elapsed <= 800) {
+        noiseSamples.push(rms);
+        micStatus = '校準環境音';
+        return;
+    }
+    if (noiseSamples.length) {
+        const avgNoise = noiseSamples.reduce((sum, val) => sum + val, 0) / noiseSamples.length;
+        inputGateRms = Math.max(0.006, avgNoise * 2.5, BASE_INPUT_RMS * 0.75);
+        noiseSamples = [];
+    }
+}
+
+function updateMicMeter(rms) {
+    const fill = document.getElementById('mic-meter-fill');
+    const status = document.getElementById('mic-status');
+    const rmsLabel = document.getElementById('mic-rms');
+    if (!fill || !status || !rmsLabel) return;
+    const level = Math.max(0, Math.min(100, (rms / 0.09) * 100));
+    fill.style.width = `${level}%`;
+    status.innerText = micStatus;
+    rmsLabel.innerText = rms.toFixed(3);
+}
+
+function autoCorrelate(buf, sampleRate, rms = getRms(buf), gate = inputGateRms) {
+    let size = buf.length;
+    if (rms < gate) return -1;
 
     let r1 = 0, r2 = size - 1, thres = 0.2;
     for (let i = 0; i < size / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
@@ -752,17 +828,37 @@ function detectPitch() {
 
 function getMicrophoneDetection() {
     analyser.getFloatTimeDomainData(buffer);
-    const freq = autoCorrelate(buffer, audioContext.sampleRate);
-    if (freq === -1) return null;
+    currentInputRms = getRms(buffer);
+    updateNoiseGate(currentInputRms);
+    const aboveGate = currentInputRms >= inputGateRms;
+    if (!noiseSamples.length && aboveGate) micStatus = '收到聲音';
+    else if (!noiseSamples.length) micStatus = '已授權';
+    updateMicMeter(currentInputRms);
+
+    const freq = autoCorrelate(buffer, audioContext.sampleRate, currentInputRms, inputGateRms);
+    if (freq === -1) {
+        if (aboveGate) {
+            micStatus = '收到聲音，正在找音高';
+            updateMicMeter(currentInputRms);
+            document.getElementById('debug-info').innerText = `RMS: ${currentInputRms.toFixed(3)} | 門檻: ${inputGateRms.toFixed(3)} | 判定: 找音高`;
+            return { freq: null, note: null, cents: 0, accepted: false, heard: true };
+        }
+        document.getElementById('debug-info').innerText = `RMS: ${currentInputRms.toFixed(3)} | 門檻: ${inputGateRms.toFixed(3)} | 判定: 無`;
+        return null;
+    }
 
     const closest = findClosestNote(freq);
     if (!closest || Math.abs(closest.cents) > 170) {
+        micStatus = '偵測到音高';
+        updateMicMeter(currentInputRms);
         document.getElementById('debug-info').innerText = `偵測音頻: ${Math.round(freq)} Hz | 判定: 無`;
         return { freq, note: null, cents: 0, accepted: false };
     }
 
     const setting = modeSettings[currentMode];
     const accepted = Math.abs(closest.cents) <= setting.toleranceCents;
+    micStatus = '偵測到音高';
+    updateMicMeter(currentInputRms);
     document.getElementById('debug-info').innerText = `偵測音頻: ${Math.round(freq)} Hz | 判定: ${accepted ? closest.note.name : '接近 ' + closest.note.name}`;
     return { freq, note: closest.note, cents: closest.cents, accepted };
 }
@@ -772,13 +868,21 @@ function getDemoDetection() {
     if (!target) return null;
     const drift = Math.sin(performance.now() / 360) * (modeSettings[currentMode].toleranceCents * 0.34);
     const freq = target.note.freq * Math.pow(2, drift / 1200);
+    micStatus = 'Demo 模式';
+    updateMicMeter(0.045);
     return { freq, note: target.note, cents: drift, accepted: true };
 }
 
 function updateTuner(detection) {
     if (!detection || !detection.note) {
         resetTuner();
-        if (!detection) document.getElementById('debug-info').innerText = '偵測音頻: --- Hz | 判定: 無';
+        if (detection && detection.heard) {
+            const label = document.getElementById('tuner-label');
+            label.innerText = '有收到聲音，正在找音高';
+            label.style.color = '#f9ca24';
+        } else if (!detection) {
+            document.getElementById('debug-info').innerText = '偵測音頻: --- Hz | 判定: 無';
+        }
         return;
     }
 
