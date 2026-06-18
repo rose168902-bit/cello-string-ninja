@@ -408,7 +408,10 @@ let audioInitialized = false;
 let pitchInterval = null;
 let activeSidebarCard = null;
 let sidebarTimer = null;
-const BASE_INPUT_RMS = 0.008;
+const BASE_INPUT_RMS = 0.004;
+const MIN_DYNAMIC_GATE_RMS = 0.003;
+const NOISE_GATE_MULTIPLIER = 1.8;
+const METER_FULL_SCALE_RMS = 0.045;
 let inputGateRms = BASE_INPUT_RMS;
 let currentInputRms = 0;
 let noiseSamples = [];
@@ -726,7 +729,7 @@ function updateNoiseGate(rms) {
     }
     if (noiseSamples.length) {
         const avgNoise = noiseSamples.reduce((sum, val) => sum + val, 0) / noiseSamples.length;
-        inputGateRms = Math.max(0.006, avgNoise * 2.5, BASE_INPUT_RMS * 0.75);
+        inputGateRms = Math.max(MIN_DYNAMIC_GATE_RMS, avgNoise * NOISE_GATE_MULTIPLIER, BASE_INPUT_RMS * 0.75);
         noiseSamples = [];
     }
 }
@@ -736,7 +739,7 @@ function updateMicMeter(rms) {
     const status = document.getElementById('mic-status');
     const rmsLabel = document.getElementById('mic-rms');
     if (!fill || !status || !rmsLabel) return;
-    const level = Math.max(0, Math.min(100, (rms / 0.09) * 100));
+    const level = Math.max(0, Math.min(100, (rms / METER_FULL_SCALE_RMS) * 100));
     fill.style.width = `${level}%`;
     status.innerText = micStatus;
     rmsLabel.innerText = rms.toFixed(3);
