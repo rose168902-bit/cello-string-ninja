@@ -169,6 +169,7 @@
         .panel h3 { margin: 22px 0 10px; font-size: 16px; letter-spacing: 0; color: #f9ca24; }
         .panel-subtitle { color: #cbd5e1; font-size: 15px; line-height: 1.6; margin: 6px auto 18px; max-width: 390px; }
         .mode-caption { display: block; font-size: 12px; font-weight: 700; opacity: 0.78; margin-top: 2px; }
+        .menu-status { min-height: 22px; color: #cbd5e1; font-size: 13px; font-weight: 800; margin: 8px 0 4px; }
         .string-map {
             display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
             margin: 18px auto 14px; max-width: 390px;
@@ -293,13 +294,13 @@
                     <p>🔴 <b>長弓目標</b>：大型目標需要持續穩定演奏，外圈充滿才會切開。</p>
                     <p>🔥 <b>Fever</b>：連續命中會累積能量，觸發後分數加倍。</p>
                 </div>
-                <button class="nav-arrow" onclick="slideMenu(1)">▼ 返回主畫面 ▼</button>
+                <button class="nav-arrow" data-slide="1">▼ 返回主畫面 ▼</button>
             </div>
         </div>
 
         <div class="menu-page" id="page-main">
             <div class="panel">
-                <button class="nav-arrow" onclick="slideMenu(0)">▲ 規則說明 ▲</button>
+                <button class="nav-arrow" data-slide="0">▲ 規則說明 ▲</button>
 
                 <h1><a href="https://www.youtube.com/@datoemusic" target="_blank" class="title-link">弦音忍者</a></h1>
                 <p class="panel-subtitle">第一章：大提琴空弦道場。先用 C、G、D、A 四條空弦，把音準、穩定度和反應練成遊戲。</p>
@@ -311,17 +312,18 @@
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn-mode btn-practice" onclick="startGame('practice')">🌱 空弦練習 <span class="mode-caption">較慢、容許較寬</span></button>
-                    <button class="btn-mode btn-challenge" onclick="startGame('challenge')">🥷 道場挑戰 <span class="mode-caption">較快、音準較嚴</span></button>
+                    <button class="btn-mode btn-practice" data-mode="practice">🌱 空弦練習 <span class="mode-caption">較慢、容許較寬</span></button>
+                    <button class="btn-mode btn-challenge" data-mode="challenge">🥷 道場挑戰 <span class="mode-caption">較快、音準較嚴</span></button>
                 </div>
+                <div id="menu-status" class="menu-status" aria-live="polite"></div>
 
-                <button class="nav-arrow" onclick="slideMenu(2)">▼ 排行榜 ▼</button>
+                <button class="nav-arrow" data-slide="2">▼ 排行榜 ▼</button>
             </div>
         </div>
 
         <div class="menu-page" id="page-leaderboard">
             <div class="panel">
-                <button class="nav-arrow" onclick="slideMenu(1)">▲ 返回主畫面 ▲</button>
+                <button class="nav-arrow" data-slide="1">▲ 返回主畫面 ▲</button>
                 <h2>🏆 英雄榜 🏆 </h2>
                 <table id="leaderboardTable">
                     <tr><th>名次</th><th>玩家</th><th>分數</th></tr>
@@ -474,10 +476,21 @@ function loadLeaderboard() {
 }
 loadLeaderboard();
 
+function setMenuStatus(message, color = '#cbd5e1') {
+    const status = document.getElementById('menu-status');
+    if (!status) return;
+    status.innerText = message;
+    status.style.color = color;
+}
+
 async function startGame(mode) {
     currentMode = mode;
+    setMenuStatus(simulatedInputMode ? '正在啟動 Demo 模式...' : '正在請求麥克風權限...', '#f9ca24');
     const audioReady = await initAudio();
-    if (!audioReady) return;
+    if (!audioReady) {
+        setMenuStatus('麥克風未授權，遊戲尚未開始。請允許麥克風後再試一次。', '#ff7675');
+        return;
+    }
     if (!simulatedInputMode) {
         resetNoiseCalibration();
         micStatus = '已授權';
@@ -491,6 +504,7 @@ async function startGame(mode) {
     document.getElementById('note-sidebar').style.display = 'flex';
     document.getElementById('fever-container').style.display = 'block';
     document.getElementById('tuner-container').style.display = 'flex';
+    setMenuStatus('');
 
     clearRuntimeObjects();
     score = 0; combo = 0; timeLeft = 60; energy = 0; isFever = false;
@@ -522,6 +536,9 @@ async function initAudio() {
 
     if (!audioInitialized) {
         try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('getUserMedia is unavailable in this browser context.');
+            }
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: false,
@@ -1319,6 +1336,12 @@ function resizeGame() {
 }
 
 window.addEventListener('resize', resizeGame);
+document.querySelectorAll('[data-slide]').forEach((button) => {
+    button.addEventListener('click', () => slideMenu(Number(button.dataset.slide)));
+});
+document.querySelectorAll('[data-mode]').forEach((button) => {
+    button.addEventListener('click', () => startGame(button.dataset.mode));
+});
 window.startGame = startGame;
 window.slideMenu = slideMenu;
 </script>
