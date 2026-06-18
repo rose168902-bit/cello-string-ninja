@@ -519,7 +519,7 @@ async function initThreeScene() {
     if (threeState.ready) return true;
     if (threeState.loading) return threeState.loading;
 
-    threeState.loading = import('./vendor/three.module.min.js')
+    threeState.loading = import('https://unpkg.com/three@0.165.0/build/three.module.min.js')
         .then((module) => {
             THREE = module;
             threeState.scene = new THREE.Scene();
