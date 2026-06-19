@@ -403,22 +403,28 @@ const modeSettings = {
     },
 };
 
-let audioContext, analyser;
+let audioContext, analyser, micStream, micSource, silentOutputGain;
 const bufferLength = 4096;
 let buffer = new Float32Array(bufferLength);
 let audioInitialized = false;
 let pitchInterval = null;
 let activeSidebarCard = null;
 let sidebarTimer = null;
-const BASE_INPUT_RMS = 0.004;
-const MIN_DYNAMIC_GATE_RMS = 0.003;
-const NOISE_GATE_MULTIPLIER = 1.8;
-const METER_FULL_SCALE_RMS = 0.045;
+const BASE_INPUT_RMS = 0.0015;
+const MIN_DYNAMIC_GATE_RMS = 0.0012;
+const NOISE_GATE_MULTIPLIER = 1.55;
+const METER_FULL_SCALE_RMS = 0.03;
+const SILENCE_RMS = 0.0002;
+const ZERO_INPUT_HINT_MS = 1800;
+const PITCH_MIN_FREQ = 52;
+const PITCH_MAX_FREQ = 520;
 let inputGateRms = BASE_INPUT_RMS;
 let currentInputRms = 0;
 let noiseSamples = [];
 let noiseCalibrationStartedAt = 0;
 let micStatus = '未授權';
+let zeroInputStartedAt = 0;
+let lastNonZeroInputAt = 0;
 
 let THREE = null;
 const threeState = {
@@ -525,6 +531,106 @@ async function startGame(mode) {
     }, 1000);
 }
 
+function createAudioContext() {
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) throw new Error('AudioContext is unavailable in this browser.');
+    try {
+        return new AudioCtor({ latencyHint: 'interactive' });
+    } catch (err) {
+        return new AudioCtor();
+    }
+}
+
+async function ensureAudioContextRunning() {
+    if (!audioContext || audioContext.state === 'closed') audioContext = createAudioContext();
+    if (audioContext.state === 'suspended') await audioContext.resume();
+    ensureSilentOutput();
+    return audioContext;
+}
+
+function ensureSilentOutput() {
+    if (!audioContext || silentOutputGain) return;
+    silentOutputGain = audioContext.createGain();
+    silentOutputGain.gain.value = 0;
+    silentOutputGain.connect(audioContext.destination);
+
+    const unlockSource = audioContext.createBufferSource();
+    unlockSource.buffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
+    unlockSource.connect(silentOutputGain);
+    try { unlockSource.start(0); } catch (err) { /* Silent warm-up can only start once. */ }
+}
+
+async function requestMicrophoneStream() {
+    const preferredConstraints = {
+        audio: {
+            echoCancellation: { ideal: false },
+            noiseSuppression: { ideal: false },
+            autoGainControl: { ideal: false },
+            channelCount: { ideal: 1 },
+        }
+    };
+    try {
+        return await navigator.mediaDevices.getUserMedia(preferredConstraints);
+    } catch (err) {
+        if (err && (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError')) {
+            return navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+        throw err;
+    }
+}
+
+function activeMicTrack() {
+    return micStream ? micStream.getAudioTracks()[0] : null;
+}
+
+function connectMicrophoneStream(stream) {
+    micStream = stream;
+    if (micSource) {
+        try { micSource.disconnect(); } catch (err) {}
+    }
+    if (analyser) {
+        try { analyser.disconnect(); } catch (err) {}
+    }
+
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = bufferLength * 2;
+    analyser.smoothingTimeConstant = 0.08;
+    micSource = audioContext.createMediaStreamSource(micStream);
+    micSource.connect(analyser);
+    ensureSilentOutput();
+    analyser.connect(silentOutputGain);
+
+    const track = activeMicTrack();
+    if (!track) return;
+    track.onmute = () => {
+        micStatus = '麥克風靜音中';
+        updateMicMeter(currentInputRms);
+    };
+    track.onunmute = () => {
+        micStatus = '已授權';
+        resetZeroInputWatch();
+        updateMicMeter(currentInputRms);
+    };
+    track.onended = () => {
+        micStatus = '麥克風已停止';
+        updateMicMeter(0);
+    };
+}
+
+function resetZeroInputWatch() {
+    zeroInputStartedAt = 0;
+    lastNonZeroInputAt = performance.now();
+}
+
+async function resumeAudioPipeline() {
+    if (!audioContext || audioContext.state !== 'suspended') return;
+    try {
+        await audioContext.resume();
+        micStatus = '已授權';
+        updateMicMeter(currentInputRms);
+    } catch (err) {}
+}
+
 async function initAudio() {
     if (simulatedInputMode) {
         if (!pitchInterval) pitchInterval = setInterval(detectPitch, 50);
@@ -534,26 +640,23 @@ async function initAudio() {
         return true;
     }
 
+    const existingTrack = activeMicTrack();
+    if (audioInitialized && (!analyser || !existingTrack || existingTrack.readyState === 'ended')) {
+        audioInitialized = false;
+    }
+
     if (!audioInitialized) {
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 throw new Error('getUserMedia is unavailable in this browser context.');
             }
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false,
-                }
-            });
-            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
-            if (audioContext.state === 'suspended') await audioContext.resume();
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = bufferLength * 2;
-            analyser.smoothingTimeConstant = 0.18;
-            audioContext.createMediaStreamSource(stream).connect(analyser);
+            await ensureAudioContextRunning();
+            const stream = await requestMicrophoneStream();
+            await ensureAudioContextRunning();
+            connectMicrophoneStream(stream);
             audioInitialized = true;
             resetNoiseCalibration();
+            resetZeroInputWatch();
             micStatus = '已授權';
             updateMicMeter(0);
             pitchInterval = setInterval(detectPitch, 50);
@@ -568,11 +671,18 @@ async function initAudio() {
             return false;
         }
     } else if (audioContext && audioContext.state === 'suspended') {
-        await audioContext.resume();
+        await resumeAudioPipeline();
         micStatus = '已授權';
     }
     return true;
 }
+
+['pointerdown', 'touchend', 'click'].forEach((eventName) => {
+    window.addEventListener(eventName, resumeAudioPipeline, { passive: true });
+});
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) resumeAudioPipeline();
+});
 
 async function initThreeScene() {
     if (threeState.ready) return true;
@@ -734,6 +844,7 @@ function resetNoiseCalibration() {
     currentInputRms = 0;
     noiseSamples = [];
     noiseCalibrationStartedAt = performance.now();
+    resetZeroInputWatch();
 }
 
 function updateNoiseGate(rms) {
@@ -763,36 +874,63 @@ function updateMicMeter(rms) {
 }
 
 function autoCorrelate(buf, sampleRate, rms = getRms(buf), gate = inputGateRms) {
-    let size = buf.length;
     if (rms < gate) return -1;
 
-    let r1 = 0, r2 = size - 1, thres = 0.2;
-    for (let i = 0; i < size / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
-    for (let i = 1; i < size / 2; i++) if (Math.abs(buf[size - i]) < thres) { r2 = size - i; break; }
-    buf = buf.slice(r1, r2);
-    size = buf.length;
+    const size = buf.length;
+    const minLag = Math.max(2, Math.floor(sampleRate / PITCH_MAX_FREQ));
+    const maxLag = Math.min(size - 2, Math.ceil(sampleRate / PITCH_MIN_FREQ));
+    if (maxLag <= minLag) return -1;
 
-    const c = new Array(size).fill(0);
-    for (let i = 0; i < size; i++) {
-        for (let j = 0; j < size - i; j++) c[i] += buf[j] * buf[j + i];
+    let mean = 0;
+    for (let i = 0; i < size; i++) mean += buf[i];
+    mean /= size;
+
+    const stride = sampleRate >= 48000 ? 2 : 1;
+    const scores = new Float32Array(maxLag + 2);
+    let bestLag = -1;
+    let bestScore = 0;
+
+    for (let lag = minLag; lag <= maxLag; lag++) {
+        let corr = 0;
+        let energyA = 0;
+        let energyB = 0;
+        for (let i = 0; i < size - lag; i += stride) {
+            const a = buf[i] - mean;
+            const b = buf[i + lag] - mean;
+            corr += a * b;
+            energyA += a * a;
+            energyB += b * b;
+        }
+        if (!energyA || !energyB) continue;
+        const score = corr / Math.sqrt(energyA * energyB);
+        scores[lag] = score;
+        if (score > bestScore) {
+            bestScore = score;
+            bestLag = lag;
+        }
     }
 
-    let d = 0;
-    while (c[d] > c[d + 1]) d++;
-    let maxval = -1, maxpos = -1;
-    for (let i = d; i < size; i++) {
-        if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+    if (bestLag === -1 || bestScore < 0.42) return -1;
+
+    for (let lag = minLag; lag < bestLag; lag++) {
+        const isLocalPeak = scores[lag] > scores[lag - 1] && scores[lag] >= scores[lag + 1];
+        if (isLocalPeak && scores[lag] > bestScore * 0.9) {
+            bestLag = lag;
+            bestScore = scores[lag];
+            break;
+        }
     }
-    if (maxpos < 20 || maxpos > 1800) return -1;
 
-    const x1 = c[maxpos - 1] || 0;
-    const x2 = c[maxpos];
-    const x3 = c[maxpos + 1] || 0;
-    const a = (x1 + x3 - 2 * x2) / 2;
-    const b = (x3 - x1) / 2;
-    if (a) maxpos = maxpos - b / (2 * a);
+    const x1 = scores[bestLag - 1] || 0;
+    const x2 = scores[bestLag];
+    const x3 = scores[bestLag + 1] || 0;
+    const denom = x1 - 2 * x2 + x3;
+    const refinedLag = denom ? bestLag + 0.5 * (x1 - x3) / denom : bestLag;
+    if (!Number.isFinite(refinedLag) || refinedLag <= 0) return -1;
 
-    return sampleRate / maxpos;
+    const freq = sampleRate / refinedLag;
+    if (!Number.isFinite(freq) || freq < PITCH_MIN_FREQ || freq > PITCH_MAX_FREQ) return -1;
+    return freq;
 }
 
 function centsBetween(freq, targetFreq) {
@@ -847,13 +985,46 @@ function detectPitch() {
 }
 
 function getMicrophoneDetection() {
+    if (!analyser || !audioContext) {
+        micStatus = '音訊尚未連線';
+        updateMicMeter(0);
+        return null;
+    }
+    if (audioContext.state !== 'running') {
+        micStatus = '音訊暫停，點一下畫面';
+        updateMicMeter(currentInputRms);
+        resumeAudioPipeline();
+        return null;
+    }
+
     analyser.getFloatTimeDomainData(buffer);
     currentInputRms = getRms(buffer);
     updateNoiseGate(currentInputRms);
+    const now = performance.now();
+    const track = activeMicTrack();
+    if (currentInputRms >= SILENCE_RMS) {
+        lastNonZeroInputAt = now;
+        zeroInputStartedAt = 0;
+    } else if (!zeroInputStartedAt) {
+        zeroInputStartedAt = now;
+    }
+
     const aboveGate = currentInputRms >= inputGateRms;
-    if (!noiseSamples.length && aboveGate) micStatus = '收到聲音';
-    else if (!noiseSamples.length) micStatus = '已授權';
+    const zeroInputTooLong = zeroInputStartedAt && now - zeroInputStartedAt > ZERO_INPUT_HINT_MS;
+    if (!noiseSamples.length) {
+        if (track && track.readyState === 'ended') micStatus = '麥克風已停止';
+        else if (track && track.muted) micStatus = '麥克風靜音中';
+        else if (aboveGate) micStatus = '收到聲音';
+        else if (zeroInputTooLong) micStatus = '已授權，等聲音進來';
+        else micStatus = '已授權';
+    }
     updateMicMeter(currentInputRms);
+
+    if (zeroInputTooLong && currentInputRms < SILENCE_RMS) {
+        document.getElementById('debug-info').innerText =
+            `RMS: 0.000 | Audio: ${audioContext.state} | Track: ${track ? track.readyState : 'none'}`;
+        return null;
+    }
 
     const freq = autoCorrelate(buffer, audioContext.sampleRate, currentInputRms, inputGateRms);
     if (freq === -1) {
