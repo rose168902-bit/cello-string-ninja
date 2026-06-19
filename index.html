@@ -417,7 +417,14 @@ const METER_FULL_SCALE_RMS = 0.03;
 const SILENCE_RMS = 0.0002;
 const ZERO_INPUT_HINT_MS = 1800;
 const PITCH_MIN_FREQ = 52;
-const PITCH_MAX_FREQ = 520;
+const PITCH_MAX_FREQ = 1400;
+const HARMONIC_FACTORS = [0.5, 1, 2, 3, 4, 5, 6];
+const STRING_TEMPLATE_CENT_RANGE = 128;
+const STRING_TEMPLATE_CENT_STEP = 8;
+const STRING_TEMPLATE_MAX_FREQ = 1600;
+const STRING_TEMPLATE_HARMONIC_WEIGHTS = [0.75, 1.0, 0.82, 0.62, 0.45, 0.32];
+const STRING_TEMPLATE_MIN_SCORE = 0.00005;
+const STRING_TEMPLATE_MIN_SCORE_TO_RMS = 0.08;
 let inputGateRms = BASE_INPUT_RMS;
 let currentInputRms = 0;
 let noiseSamples = [];
@@ -873,6 +880,91 @@ function updateMicMeter(rms) {
     rmsLabel.innerText = rms.toFixed(3);
 }
 
+function getBufferMean(buf) {
+    let mean = 0;
+    for (let i = 0; i < buf.length; i++) mean += buf[i];
+    return mean / buf.length;
+}
+
+function goertzelMagnitude(buf, sampleRate, freq, mean = 0) {
+    const size = buf.length;
+    const omega = 2 * Math.PI * freq / sampleRate;
+    const coeff = 2 * Math.cos(omega);
+    let sPrev = 0;
+    let sPrev2 = 0;
+    for (let i = 0; i < size; i++) {
+        const s = (buf[i] - mean) + coeff * sPrev - sPrev2;
+        sPrev2 = sPrev;
+        sPrev = s;
+    }
+    const power = sPrev2 * sPrev2 + sPrev * sPrev - coeff * sPrev * sPrev2;
+    return Math.sqrt(Math.max(0, power)) / size;
+}
+
+function scoreStringTemplate(buf, sampleRate, note, cents, mean) {
+    const baseFreq = note.freq * Math.pow(2, cents / 1200);
+    let score = 0;
+    let weightTotal = 0;
+    for (let i = 0; i < STRING_TEMPLATE_HARMONIC_WEIGHTS.length; i++) {
+        const harmonic = i + 1;
+        const freq = baseFreq * harmonic;
+        if (freq > STRING_TEMPLATE_MAX_FREQ || freq >= sampleRate / 2) continue;
+        const weight = STRING_TEMPLATE_HARMONIC_WEIGHTS[i];
+        score += goertzelMagnitude(buf, sampleRate, freq, mean) * weight;
+        weightTotal += weight;
+    }
+    return weightTotal ? score / weightTotal : 0;
+}
+
+function estimateOpenStringFromHarmonics(buf, sampleRate, rms) {
+    if (rms < Math.max(SILENCE_RMS * 2, inputGateRms * 0.55)) return null;
+
+    const mean = getBufferMean(buf);
+    let best = null;
+    let secondScore = 0;
+
+    for (const note of notes) {
+        let noteBest = { note, cents: 0, score: 0 };
+        for (let cents = -STRING_TEMPLATE_CENT_RANGE; cents <= STRING_TEMPLATE_CENT_RANGE; cents += STRING_TEMPLATE_CENT_STEP) {
+            const score = scoreStringTemplate(buf, sampleRate, note, cents, mean);
+            if (score > noteBest.score) noteBest = { note, cents, score };
+        }
+        if (!best || noteBest.score > best.score) {
+            secondScore = best ? best.score : secondScore;
+            best = noteBest;
+        } else if (noteBest.score > secondScore) {
+            secondScore = noteBest.score;
+        }
+    }
+
+    if (!best) return null;
+    const minScore = Math.max(STRING_TEMPLATE_MIN_SCORE, rms * STRING_TEMPLATE_MIN_SCORE_TO_RMS);
+    const scoreRatio = best.score / Math.max(secondScore, 0.000001);
+    if (best.score < minScore || (scoreRatio < 1.04 && best.score < rms * 0.18)) return null;
+
+    const refinedCents = refineTemplateCents(buf, sampleRate, best.note, best.cents, mean);
+    const setting = modeSettings[currentMode];
+    return {
+        freq: best.note.freq * Math.pow(2, refinedCents / 1200),
+        note: best.note,
+        cents: refinedCents,
+        accepted: Math.abs(refinedCents) <= setting.toleranceCents,
+        source: 'harmonic-template',
+        confidence: scoreRatio,
+    };
+}
+
+function refineTemplateCents(buf, sampleRate, note, roughCents, mean) {
+    let best = { cents: roughCents, score: 0 };
+    const start = roughCents - STRING_TEMPLATE_CENT_STEP;
+    const end = roughCents + STRING_TEMPLATE_CENT_STEP;
+    for (let cents = start; cents <= end; cents += 2) {
+        const score = scoreStringTemplate(buf, sampleRate, note, cents, mean);
+        if (score > best.score) best = { cents, score };
+    }
+    return best.cents;
+}
+
 function autoCorrelate(buf, sampleRate, rms = getRms(buf), gate = inputGateRms) {
     if (rms < gate) return -1;
 
@@ -938,7 +1030,7 @@ function centsBetween(freq, targetFreq) {
 }
 
 function foldedCents(freq, targetFreq) {
-    const candidates = [0.5, 1, 2].map((factor) => centsBetween(freq, targetFreq * factor));
+    const candidates = HARMONIC_FACTORS.map((factor) => centsBetween(freq, targetFreq * factor));
     return candidates.reduce((best, val) => Math.abs(val) < Math.abs(best) ? val : best, candidates[0]);
 }
 
@@ -953,6 +1045,19 @@ function findClosestNote(freq) {
         }
     }
     return closest ? { note: closest, cents } : null;
+}
+
+function buildDetectionFromFrequency(freq, source = 'autocorrelation') {
+    const closest = findClosestNote(freq);
+    if (!closest || Math.abs(closest.cents) > 190) return null;
+    const setting = modeSettings[currentMode];
+    return {
+        freq,
+        note: closest.note,
+        cents: closest.cents,
+        accepted: Math.abs(closest.cents) <= setting.toleranceCents,
+        source,
+    };
 }
 
 function highlightSidebar(noteId) {
@@ -1026,8 +1131,24 @@ function getMicrophoneDetection() {
         return null;
     }
 
+    let harmonicDetection = null;
+    const getHarmonicDetection = () => {
+        if (!aboveGate) return null;
+        if (!harmonicDetection) {
+            harmonicDetection = estimateOpenStringFromHarmonics(buffer, audioContext.sampleRate, currentInputRms);
+        }
+        return harmonicDetection;
+    };
     const freq = autoCorrelate(buffer, audioContext.sampleRate, currentInputRms, inputGateRms);
     if (freq === -1) {
+        harmonicDetection = getHarmonicDetection();
+        if (harmonicDetection) {
+            micStatus = '偵測到空弦';
+            updateMicMeter(currentInputRms);
+            document.getElementById('debug-info').innerText =
+                `泛音判定: ${harmonicDetection.note.name} | 偏差: ${Math.round(harmonicDetection.cents)} cents`;
+            return harmonicDetection;
+        }
         if (aboveGate) {
             micStatus = '收到聲音，正在找音高';
             updateMicMeter(currentInputRms);
@@ -1038,20 +1159,28 @@ function getMicrophoneDetection() {
         return null;
     }
 
-    const closest = findClosestNote(freq);
-    if (!closest || Math.abs(closest.cents) > 170) {
+    const frequencyDetection = buildDetectionFromFrequency(freq);
+    if (!frequencyDetection) harmonicDetection = getHarmonicDetection();
+    if (!frequencyDetection && harmonicDetection) {
+        micStatus = '偵測到空弦';
+        updateMicMeter(currentInputRms);
+        document.getElementById('debug-info').innerText =
+            `泛音判定: ${harmonicDetection.note.name} | 偏差: ${Math.round(harmonicDetection.cents)} cents`;
+        return harmonicDetection;
+    }
+
+    if (!frequencyDetection) {
         micStatus = '偵測到音高';
         updateMicMeter(currentInputRms);
         document.getElementById('debug-info').innerText = `偵測音頻: ${Math.round(freq)} Hz | 判定: 無`;
         return { freq, note: null, cents: 0, accepted: false };
     }
 
-    const setting = modeSettings[currentMode];
-    const accepted = Math.abs(closest.cents) <= setting.toleranceCents;
     micStatus = '偵測到音高';
     updateMicMeter(currentInputRms);
-    document.getElementById('debug-info').innerText = `偵測音頻: ${Math.round(freq)} Hz | 判定: ${accepted ? closest.note.name : '接近 ' + closest.note.name}`;
-    return { freq, note: closest.note, cents: closest.cents, accepted };
+    document.getElementById('debug-info').innerText =
+        `偵測音頻: ${Math.round(freq)} Hz | 判定: ${frequencyDetection.accepted ? frequencyDetection.note.name : '接近 ' + frequencyDetection.note.name}`;
+    return frequencyDetection;
 }
 
 function getDemoDetection() {
